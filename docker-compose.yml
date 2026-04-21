@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: canvas_user
+      POSTGRES_PASSWORD: canvas_pass
+      POSTGRES_DB: canvas_mcp_prod
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canvas_user -d canvas_mcp_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    ports:
+      - 4000:4000
+    command: |
+      mix phx.server
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: ecto://canvas_user:canvas_pass@db/canvas_mcp_prod
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      PHX_HOST: 0.0.0.0
+      PORT: 4000
+      POOL_SIZE: 10
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

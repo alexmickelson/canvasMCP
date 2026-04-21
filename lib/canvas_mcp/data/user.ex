@@ -1,0 +1,93 @@
+defmodule CanvasMcp.Data.User do
+  require Logger
+  alias CanvasMcp.Data.DbHelpers
+
+  def schema do
+    Zoi.object(%{
+      id: Zoi.uuid(),
+      email: Zoi.string(),
+      is_admin: Zoi.boolean(),
+      inserted_at: Zoi.datetime(),
+      updated_at: Zoi.datetime()
+    })
+  end
+
+
+  def find_or_create(email) do
+    sql = """
+    INSERT INTO users (email)
+    VALUES ($(email))
+    ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
+    RETURNING id, email, inserted_at, updated_at
+    """
+
+    case DbHelpers.run_sql(sql, %{"email" => email}) do
+      {:error, reason} ->
+        {:error, reason}
+
+      [] ->
+        {:error, :not_found}
+
+      [%{"id" => user_id} | _] ->
+        with :ok <- bootstrap_if_first(user_id) do
+          get_by_id(user_id)
+        end
+    end
+  end
+
+
+  def get_by_id(user_id) do
+    case select_with_admin_join("WHERE u.id = $(user_id)", %{"user_id" => user_id}) do
+      [user | _] -> {:ok, user}
+      [] -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def get_by_email(email) do
+    case select_with_admin_join("WHERE u.email = $(email)", %{"email" => email}) do
+      [user | _] -> {:ok, user}
+      [] -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def grant_admin(user_id, granted_by \\ nil) do
+    sql = """
+    INSERT INTO admins (user_id, granted_by)
+    VALUES ($(user_id), $(granted_by))
+    ON CONFLICT (user_id) DO NOTHING
+    """
+
+    case DbHelpers.run_sql(sql, %{"user_id" => user_id, "granted_by" => granted_by}) do
+      {:error, reason} -> {:error, reason}
+      _ -> :ok
+    end
+  end
+
+  # Bootstraps the first admin: if no admins exist yet, grants admin to user_id.
+  defp bootstrap_if_first(user_id) do
+    sql = "SELECT COUNT(*) AS count FROM admins"
+
+    case DbHelpers.run_sql(sql, %{}) do
+      [%{"count" => 0}] ->
+        Logger.info("No admins found — granting admin to first user user_id=#{user_id}")
+        grant_admin(user_id, nil)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp select_with_admin_join(where_clause, params) do
+    sql = """
+    SELECT u.id, u.email, u.inserted_at, u.updated_at,
+           (a.user_id IS NOT NULL) AS is_admin
+    FROM users u
+    LEFT JOIN admins a ON a.user_id = u.id
+    #{where_clause}
+    """
+
+    DbHelpers.run_sql(sql, params, schema())
+  end
+end
