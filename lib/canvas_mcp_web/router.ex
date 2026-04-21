@@ -18,10 +18,23 @@ defmodule CanvasMcpWeb.Router do
     plug :require_admin_user
   end
 
+  pipeline :require_authenticated do
+    plug :require_authenticated_user
+  end
+
   scope "/", CanvasMcpWeb do
     pipe_through :browser
 
     get "/", PageController, :home
+  end
+
+  scope "/", CanvasMcpWeb do
+    pipe_through [:browser, :require_authenticated]
+
+    live_session :authenticated,
+      on_mount: [] do
+      live "/app", HomeLive
+    end
   end
 
   scope "/admin", CanvasMcpWeb.Admin do
@@ -29,7 +42,7 @@ defmodule CanvasMcpWeb.Router do
 
     live_session :admin,
       on_mount: [] do
-      live "/audit", AuditLogLive
+      live "/", AuditLogLive
     end
   end
 
@@ -53,6 +66,17 @@ defmodule CanvasMcpWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard", metrics: CanvasMcpWeb.Telemetry
+    end
+  end
+
+  defp require_authenticated_user(conn, _opts) do
+    if get_session(conn, "current_user") do
+      conn
+    else
+      conn
+      |> Phoenix.Controller.put_flash(:error, "You must be logged in to access this page.")
+      |> Phoenix.Controller.redirect(to: "/")
+      |> halt()
     end
   end
 

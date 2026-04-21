@@ -7,6 +7,7 @@ defmodule CanvasMcp.Data.User do
       id: Zoi.uuid(),
       email: Zoi.string(),
       is_admin: Zoi.boolean(),
+      canvas_user_id: Zoi.nullish(Zoi.integer(coerce: true)),
       inserted_at: Zoi.datetime(),
       updated_at: Zoi.datetime()
     })
@@ -36,7 +37,7 @@ defmodule CanvasMcp.Data.User do
 
   def get_by_id(user_id) do
     sql = """
-    SELECT u.id, u.email, u.inserted_at, u.updated_at,
+    SELECT u.id, u.email, u.canvas_user_id, u.inserted_at, u.updated_at,
            (a.user_id IS NOT NULL) AS is_admin
     FROM users u
     LEFT JOIN admins a ON a.user_id = u.id
@@ -52,7 +53,7 @@ defmodule CanvasMcp.Data.User do
 
   def get_by_email(email) do
     sql = """
-    SELECT u.id, u.email, u.inserted_at, u.updated_at,
+    SELECT u.id, u.email, u.canvas_user_id, u.inserted_at, u.updated_at,
            (a.user_id IS NOT NULL) AS is_admin
     FROM users u
     LEFT JOIN admins a ON a.user_id = u.id
@@ -61,6 +62,69 @@ defmodule CanvasMcp.Data.User do
 
     case DbHelpers.run_sql(sql, %{"email" => email}, schema()) do
       [user | _] -> {:ok, user}
+      [] -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def has_canvas_token?(user_id) do
+    sql = """
+    SELECT canvas_token IS NOT NULL AS has_token
+    FROM users
+    WHERE id = $(user_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{"user_id" => user_id}) do
+      [%{"has_token" => result} | _] -> result
+      _ -> false
+    end
+  end
+
+  def get_canvas_token_for_user(user_id) do
+    sql = """
+    SELECT canvas_token
+    FROM users
+    WHERE id = $(user_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{"user_id" => user_id}) do
+      [%{"canvas_token" => token} | _] -> {:ok, token}
+      [] -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def set_canvas_token(user_id, token) do
+    sql = """
+    UPDATE users
+    SET canvas_token = $(token), updated_at = NOW()
+    WHERE id = $(user_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{"user_id" => user_id, "token" => token}) do
+      {:error, reason} -> {:error, reason}
+      _ -> :ok
+    end
+  end
+
+  def set_canvas_user_id(user_id, canvas_user_id) do
+    sql = """
+    UPDATE users
+    SET canvas_user_id = $(canvas_user_id), updated_at = NOW()
+    WHERE id = $(user_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{"user_id" => user_id, "canvas_user_id" => canvas_user_id}) do
+      {:error, reason} -> {:error, reason}
+      _ -> :ok
+    end
+  end
+
+  def get_canvas_user_id(user_id) do
+    sql = "SELECT canvas_user_id FROM users WHERE id = $(user_id)"
+
+    case DbHelpers.run_sql(sql, %{"user_id" => user_id}) do
+      [%{"canvas_user_id" => id} | _] -> {:ok, id}
       [] -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
     end

@@ -39,48 +39,72 @@ defmodule CanvasMcpWeb.Admin.AuditLogLive do
     ~H"""
     <Layouts.app flash={@flash}>
       <div class="mx-auto max-w-7xl px-4 py-8">
-        <h1 class="text-2xl font-bold text-gray-900 mb-6">Audit Log</h1>
-        <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50">
+        <%!-- Page header --%>
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-slate-50">Audit Log</h1>
+          <p class="mt-1 text-sm text-slate-400">Real-time record of all user activity</p>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-700 shadow-lg">
+          <table class="min-w-full divide-y divide-slate-700 text-sm">
+            <thead class="bg-slate-800">
               <tr>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Time</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Event</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">User</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">IP</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Data</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Time
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Event
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  User
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  IP
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Data
+                </th>
               </tr>
             </thead>
-            <tbody id="audit-entries" phx-update="stream" class="divide-y divide-gray-100 bg-white">
+            <tbody
+              id="audit-entries"
+              phx-update="stream"
+              class="divide-y divide-slate-700/60 bg-slate-900"
+            >
               <tr
                 :for={{id, entry} <- @streams.entries}
                 id={id}
-                class="hover:bg-gray-50 transition-colors"
+                class="hover:bg-slate-800/60 transition-colors"
               >
-                <td class="px-4 py-3 whitespace-nowrap text-gray-500 font-mono text-xs">
+                <td class="px-4 py-3 whitespace-nowrap text-slate-500 font-mono text-xs">
                   {Calendar.strftime(entry.inserted_at, "%Y-%m-%d %H:%M:%S")}
                 </td>
                 <td class="px-4 py-3">
                   <span class={[
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                    entry.event == "login_success" && "bg-green-100 text-green-800",
-                    entry.event == "login_failure" && "bg-red-100 text-red-800",
-                    entry.event == "logout" && "bg-gray-100 text-gray-700",
-                    entry.event == "session_refresh" && "bg-blue-100 text-blue-700"
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                    entry.event == "login_success" &&
+                      "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25",
+                    entry.event == "login_failure" &&
+                      "bg-red-500/15 text-red-400 ring-1 ring-red-500/25",
+                    entry.event == "logout" && "bg-slate-700 text-slate-400",
+                    entry.event == "session_refresh" &&
+                      "bg-sky-500/15 text-sky-400 ring-1 ring-sky-500/25"
                   ]}>
                     {entry.event}
                   </span>
                 </td>
-                <td class="px-4 py-3 text-gray-700">{entry.user_email || "—"}</td>
-                <td class="px-4 py-3 font-mono text-gray-500 text-xs">{entry.remote_ip || "—"}</td>
-                <td class="px-4 py-3 text-gray-500 text-xs font-mono">
+                <td class="px-4 py-3 text-slate-300">{entry.user_email || "—"}</td>
+                <td class="px-4 py-3 font-mono text-slate-500 text-xs">{entry.remote_ip || "—"}</td>
+                <td class="px-4 py-3 text-slate-500 text-xs font-mono">
                   <%= if entry.data && map_size(entry.data) > 0 do %>
                     <details>
-                      <summary class="cursor-pointer text-indigo-600 hover:underline">view</summary>
-                      <pre class="mt-1 text-xs whitespace-pre-wrap">{Jason.encode!(entry.data, pretty: true)}</pre>
+                      <summary class="cursor-pointer text-indigo-400 hover:text-indigo-300 transition-colors">
+                        view
+                      </summary>
+                      <pre class="mt-2 rounded-lg bg-slate-800 p-2 text-xs text-slate-300 whitespace-pre-wrap border border-slate-700">{Jason.encode!(entry.data, pretty: true)}</pre>
                     </details>
                   <% else %>
-                    —
+                    <span class="text-slate-600">—</span>
                   <% end %>
                 </td>
               </tr>

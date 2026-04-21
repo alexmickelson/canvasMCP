@@ -20,7 +20,6 @@ config :canvas_mcp, CanvasMcpWeb.Endpoint,
     ]
   ]
 
-
 # Do not print debug messages in production
 config :logger, level: :info
 
