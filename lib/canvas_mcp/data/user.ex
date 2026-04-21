@@ -12,7 +12,6 @@ defmodule CanvasMcp.Data.User do
     })
   end
 
-
   def find_or_create(email) do
     sql = """
     INSERT INTO users (email)
@@ -35,9 +34,16 @@ defmodule CanvasMcp.Data.User do
     end
   end
 
-
   def get_by_id(user_id) do
-    case select_with_admin_join("WHERE u.id = $(user_id)", %{"user_id" => user_id}) do
+    sql = """
+    SELECT u.id, u.email, u.inserted_at, u.updated_at,
+           (a.user_id IS NOT NULL) AS is_admin
+    FROM users u
+    LEFT JOIN admins a ON a.user_id = u.id
+    WHERE u.id = $(user_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{"user_id" => user_id}, schema()) do
       [user | _] -> {:ok, user}
       [] -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
@@ -45,7 +51,15 @@ defmodule CanvasMcp.Data.User do
   end
 
   def get_by_email(email) do
-    case select_with_admin_join("WHERE u.email = $(email)", %{"email" => email}) do
+    sql = """
+    SELECT u.id, u.email, u.inserted_at, u.updated_at,
+           (a.user_id IS NOT NULL) AS is_admin
+    FROM users u
+    LEFT JOIN admins a ON a.user_id = u.id
+    WHERE u.email = $(email)
+    """
+
+    case DbHelpers.run_sql(sql, %{"email" => email}, schema()) do
       [user | _] -> {:ok, user}
       [] -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
@@ -77,17 +91,5 @@ defmodule CanvasMcp.Data.User do
       _ ->
         :ok
     end
-  end
-
-  defp select_with_admin_join(where_clause, params) do
-    sql = """
-    SELECT u.id, u.email, u.inserted_at, u.updated_at,
-           (a.user_id IS NOT NULL) AS is_admin
-    FROM users u
-    LEFT JOIN admins a ON a.user_id = u.id
-    #{where_clause}
-    """
-
-    DbHelpers.run_sql(sql, params, schema())
   end
 end

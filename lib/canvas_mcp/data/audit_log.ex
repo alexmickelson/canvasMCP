@@ -15,12 +15,11 @@ defmodule CanvasMcp.Data.AuditLog do
       user_id: Zoi.optional(Zoi.nullish(Zoi.uuid())),
       event: Zoi.enum(@valid_events),
       remote_ip: Zoi.optional(Zoi.nullish(Zoi.string())),
-      data: Zoi.optional(Zoi.nullish(Zoi.map())),
+      data: Zoi.optional(Zoi.nullish(Zoi.any())),
       inserted_at: Zoi.datetime()
     })
   end
 
-  @spec record(event(), String.t() | nil, String.t() | nil, map()) :: :ok
   def record(event, user_id, remote_ip, data \\ %{}) do
     sql = """
     INSERT INTO audit_log (user_id, event, remote_ip, data)
@@ -32,7 +31,7 @@ defmodule CanvasMcp.Data.AuditLog do
       "user_id" => user_id,
       "event" => Atom.to_string(event),
       "remote_ip" => remote_ip,
-      "data" => Jason.encode!(data)
+      "data" => data
     }
 
     case DbHelpers.run_sql(sql, params, row_schema()) do
@@ -45,18 +44,16 @@ defmodule CanvasMcp.Data.AuditLog do
     end
   end
 
-  @spec list(keyword()) :: list() | {:error, atom()}
   def list(opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
     offset = Keyword.get(opts, :offset, 0)
-    order = if Keyword.get(opts, :order, :desc) == :asc, do: "ASC", else: "DESC"
 
     sql = """
     SELECT al.id, al.user_id, al.event, al.remote_ip, al.data, al.inserted_at,
            u.email AS user_email
     FROM audit_log al
     LEFT JOIN users u ON u.id = al.user_id
-    ORDER BY al.inserted_at #{order}
+    ORDER BY al.inserted_at DESC
     LIMIT $(limit)
     OFFSET $(offset)
     """
@@ -68,7 +65,7 @@ defmodule CanvasMcp.Data.AuditLog do
         user_email: Zoi.optional(Zoi.nullish(Zoi.string())),
         event: Zoi.enum(@valid_events),
         remote_ip: Zoi.optional(Zoi.nullish(Zoi.string())),
-        data: Zoi.optional(Zoi.nullish(Zoi.map())),
+        data: Zoi.optional(Zoi.nullish(Zoi.any())),
         inserted_at: Zoi.datetime()
       })
 
