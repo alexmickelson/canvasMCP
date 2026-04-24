@@ -1,22 +1,94 @@
-This is a web application written using the Phoenix web framework.
+# CanvasMCP — Domain Model
+
+Web app that syncs Canvas LMS data locally and exposes it to AI agents via MCP. Users SSO via Keycloak/OIDC, link a personal Canvas API token, and the app caches their Canvas entities in Postgres.
+
+**External services:** PostgreSQL (`DATABASE_URL`) · Keycloak OIDC/PKCE (`OIDC_ISSUER`, `OIDC_CLIENT_ID`) · Canvas LMS REST API (`CANVAS_BASE_URL`)
+
+
+## 1. Identity & Access
+
+`lib/canvas_mcp/data/user.ex` · `lib/canvas_mcp/data/audit_log.ex` · `schema.sql` (`users`, `admins`, `audit_log`)
+
+- Users are created on first SSO login via `find_or_create/1` (by email). First user is auto-granted admin.
+- Admin is a sparse join (`admins` table) — user is admin iff a row exists. `grant_admin/2` is idempotent.
+- Canvas identity is a separate concept: `canvas_user_id` is stored on the user row only after the user provides a valid Canvas API token.
+- Audit log events: `login_success | login_failure | logout | session_refresh` — broadcast on PubSub so the admin view updates live.
+
+**Design:** App users and Canvas users are intentionally separate. A user without a Canvas token is valid (degraded state).
+
+
+## 2. Canvas Data Cache
+
+`lib/canvas_mcp/data/canvas/` · `schema.sql` (`canvas_courses`, `canvas_enrollments`, `canvas_assignments`, `canvas_submissions`, `canvas_rubrics`, `canvas_users`)
+
+Local Postgres cache is the read source. Canvas API is only hit on explicit refresh or first load.
+
+**Storage pattern (all entities):** full API response in a `canvas_object` JSONB column + extracted scalar columns for querying. Primary keys are Canvas integer IDs → natural upserts (`ON CONFLICT DO UPDATE`).
+
+full table schema in `schema.sql` file.
+
+## 3. Per-User Actor
+
+`lib/canvas_mcp/user_actor/`
+
+Each logged-in user gets a dedicated `GenServer` (`UserActor`) that owns all stateful/async work for that user. State: `user`, `canvas_token`, `canvas_user`.
+
+- Started on demand via `DynamicSupervisor`; `ensure_started/1` is idempotent — called on every LiveView mount.
+- Tracked in a `Registry` (by `user_id`) and `:pg` group for cluster visibility.
+- All public calls are **async casts**. Results broadcast on `"user:<user_id>"` PubSub channel as `{:canvas, event, payload}`. LiveViews subscribe and react — the actor never touches sockets.
+
+Sub-handlers: `CanvasHandler` (course fetch, cache vs. live) · `ProfileHandler` (token save → fetch Canvas identity → link `canvas_user_id`) · `Helpers` (channel naming, broadcast)
+
+Interactions from the frontend to the backend should be handled via Phoenix Pubsub. Make sure error messages make it back to the clients via pubsub.
+
+
+## 4. Web Layer
+
+`lib/canvas_mcp_web/` — organized by **feature**, not file type.
+
+```
+admin/      AuditLogLive (/admin)
+app/        HomeLive (/app) — courses dashboard
+  courses/  AllCourses component
+  profile/  ProfileLive (/app/profile) — token + account settings
+home/       PageController (/) — public landing
+shared/     AuthController, Layouts, error handlers, components/
+```
+
+- `Layouts.app` owns the full-height shell and topbar. LiveViews don't manage chrome.
+- Flash is for infrastructure events only (disconnect, server error). User-action feedback is inline, next to the triggering element.
+- Canvas-specific components live under `app/`, not `shared/` — they are features, not utilities.
+
+
+## Data Flows
+
+**Token setup:** `ProfileLive "save_canvas_token"` → `UserActor.update_canvas_token/2` → `ProfileHandler` saves token, fetches `/users/self`, links `canvas_user_id`, broadcasts `{:canvas, :token_updated, state}` → ProfileLive shows inline status.
+
+**Course refresh:** `HomeLive "refresh_courses"` → `UserActor.get_canvas_courses/2` (invalidate: true) → `CanvasHandler` fetches all pages, upserts DB, broadcasts `{:canvas, :courses_refreshed, courses}` → HomeLive updates list, AllCourses shows "✓ Updated".
+
+
+## Code Organisation Conventions
+
+- **Feature folders, not type folders.** Files live next to the other files they work with, not in a global `controllers/`, `live/`, or `components/` directory. If you're adding something for a feature, put it in that feature's folder.
+- **One responsibility per file.** Each module does one thing. A LiveView renders and handles events for one page. A component renders one UI concept. A handler handles one actor message group. If a file is growing, split it.
+- **Filename = what it does.** `profile_live.ex` is the ProfileLive LiveView. `canvas_handler.ex` handles Canvas-related actor messages. `all_courses.ex` is the AllCourses component. The filename alone should tell you what's inside — no need to open it to check.
+- **Shared only for genuinely cross-feature code.** `shared/` holds auth, layouts, error handlers, and generic UI primitives (button, input, table). Feature-specific components like `AllCourses` belong in the feature folder even if they're technically reusable.
+
+
+## Infrastructure Notes
+
+- Raw SQL via `DbHelpers.run_sql/2` with named params (`$(param_name)`) — no Ecto changesets. Chosen to keep queries readable over heavily JSONB-centric data.
+- UUIDs stored as 16-byte binaries in Postgres; converted at the `DbHelpers` boundary.
+- Zoi schemas provide optional row-level validation on query results.
+
+
+
+--- Phoenix guidelines below ---
 
 ## Project guidelines
 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
-
-### Phoenix v1.8 guidelines
-
-- **Always** begin your LiveView templates with `<Layouts.app flash={@flash} ...>` which wraps all inner content
-- The `MyAppWeb.Layouts` module is aliased in the `my_app_web.ex` file, so you can use it without needing to alias it again
-- Anytime you run into errors with no `current_scope` assign:
-  - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`
-  - **Always** fix the `current_scope` error by moving your routes to the proper `live_session` and ensure you pass `current_scope` as needed
-- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
-- Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
-- **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will save steps and prevent errors
-- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
-custom classes must fully style the input
 
 ### JS and CSS guidelines
 
@@ -38,6 +110,9 @@ custom classes must fully style the input
 
 ### UI/UX & design guidelines
 
+- focus on heiraricy if in formation, make the most important information the first thing the user sees
+    - avoid useless information on the page
+- keep feedback on interactions spacially close to the element that triggered the interaction. Error messages and loading indicators should be close to the user.
 - **Produce world-class UI designs** with a focus on usability, aesthetics, and modern design principles
 - Implement **subtle micro-interactions** (e.g., button hover effects, and smooth transitions)
 - Ensure **clean typography, spacing, and layout balance** for a refined, premium look

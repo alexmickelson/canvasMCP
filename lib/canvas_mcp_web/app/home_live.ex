@@ -19,6 +19,7 @@ defmodule CanvasMcpWeb.App.HomeLive do
       |> assign(:current_user, current_user)
       |> assign(:courses, [])
       |> assign(:courses_status, nil)
+      |> assign(:selected_term, nil)
 
     {:ok, socket}
   end
@@ -30,9 +31,14 @@ defmodule CanvasMcpWeb.App.HomeLive do
 
   @impl true
   def handle_info({:canvas, :courses_refreshed, courses}, socket) do
+    selected_term =
+      socket.assigns.selected_term ||
+        CanvasMcpWeb.App.Courses.TermSelector.default_term(courses)
+
     {:noreply,
      socket
      |> assign(:courses, courses)
+     |> assign(:selected_term, selected_term)
      |> assign(:courses_status, :refreshed)}
   end
 
@@ -48,11 +54,16 @@ defmodule CanvasMcpWeb.App.HomeLive do
   end
 
   @impl true
+  def handle_event("select_term", %{"term" => term}, socket) do
+    {:noreply, assign(socket, :selected_term, term)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
       <div class="px-6 py-8">
-        <.all_courses courses={@courses} status={@courses_status} />
+        <.all_courses courses={@courses} status={@courses_status} selected_term={@selected_term} />
       </div>
     </Layouts.app>
     """

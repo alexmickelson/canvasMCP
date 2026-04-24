@@ -7,9 +7,7 @@ import Config
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
 config :canvas_mcp, CanvasMcpWeb.Endpoint,
-  # Binding to loopback ipv4 address prevents access from other machines.
-  # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}],
+  http: [ip: {0, 0, 0, 0}],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -51,9 +49,9 @@ config :canvas_mcp, CanvasMcpWeb.Endpoint,
       ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
       # Gettext translations
       ~r"priv/gettext/.*\.po$"E,
-      # Router, Controllers, LiveViews and LiveComponents
+      # Router and all web modules (feature-folder structure)
       ~r"lib/canvas_mcp_web/router\.ex$"E,
-      ~r"lib/canvas_mcp_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"lib/canvas_mcp_web/.*\.(ex|heex)$"E
     ]
   ]
 

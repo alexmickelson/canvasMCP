@@ -35,6 +35,7 @@ defmodule CanvasMcpWeb.Router do
       on_mount: [] do
       live "/app", HomeLive
       live "/app/profile", ProfileLive
+      live "/app/courses/:id", Courses.CourseLive
     end
   end
 
