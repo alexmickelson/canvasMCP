@@ -22,18 +22,19 @@ defmodule CanvasMcpWeb.Router do
     plug :require_authenticated_user
   end
 
-  scope "/", CanvasMcpWeb do
+  scope "/", CanvasMcpWeb.Home do
     pipe_through :browser
 
     get "/", PageController, :home
   end
 
-  scope "/", CanvasMcpWeb do
+  scope "/", CanvasMcpWeb.App do
     pipe_through [:browser, :require_authenticated]
 
     live_session :authenticated,
       on_mount: [] do
       live "/app", HomeLive
+      live "/app/profile", ProfileLive
     end
   end
 

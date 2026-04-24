@@ -85,9 +85,16 @@ defmodule CanvasMcpWeb do
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
-      import CanvasMcpWeb.CoreComponents
-      import CanvasMcpWeb.CanvasComponents.CanvasUserDisplay
-      import CanvasMcpWeb.CanvasComponents.AllCourses
+      import CanvasMcpWeb.Components.Flash
+      import CanvasMcpWeb.Components.Button
+      import CanvasMcpWeb.Components.Input
+      import CanvasMcpWeb.Components.Header
+      import CanvasMcpWeb.Components.Table
+      import CanvasMcpWeb.Components.List
+      import CanvasMcpWeb.Components.Icon
+      import CanvasMcpWeb.Components.JsCommands
+      import CanvasMcpWeb.App.Courses
+      import CanvasMcpWeb.App.Profile
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

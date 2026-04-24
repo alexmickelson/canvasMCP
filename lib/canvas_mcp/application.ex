@@ -11,7 +11,7 @@ defmodule CanvasMcp.Application do
       CanvasMcp.Repo,
       %{id: CanvasMcp.UserPG, start: {:pg, :start_link, [CanvasMcp.UserPG]}},
       {Registry, keys: :unique, name: CanvasMcp.UserRegistry},
-      {DynamicSupervisor, name: CanvasMcp.UserServerSupervisor, strategy: :one_for_one},
+      {DynamicSupervisor, name: CanvasMcp.UserActorSupervisor, strategy: :one_for_one},
       {Oidcc.ProviderConfiguration.Worker,
        %{
          issuer: Application.fetch_env!(:canvas_mcp, :oidc) |> Keyword.fetch!(:issuer),

@@ -1,8 +1,9 @@
-defmodule CanvasMcpWeb.CanvasComponents.AllCourses do
+defmodule CanvasMcpWeb.App.Courses do
   use Phoenix.Component
-  import CanvasMcpWeb.CoreComponents
+  import CanvasMcpWeb.Components.Icon
 
   attr :courses, :list, required: true
+  attr :status, :atom, default: nil
 
   def all_courses(assigns) do
     ~H"""
@@ -14,13 +15,26 @@ defmodule CanvasMcpWeb.CanvasComponents.AllCourses do
             {length(@courses)} course{if length(@courses) != 1, do: "s"}
           </p>
         </div>
-        <button
-          type="button"
-          phx-click="refresh_courses"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:border-slate-500 active:scale-95 transition-all"
-        >
-          <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Refresh from Canvas
-        </button>
+        <div class="flex items-center gap-3">
+          <%= if @status == :refreshed do %>
+            <span class="flex items-center gap-1 text-xs text-emerald-400">
+              <.icon name="hero-check" class="w-3.5 h-3.5" /> Updated
+            </span>
+          <% end %>
+          <%= if @status == :refreshing do %>
+            <span class="flex items-center gap-1 text-xs text-slate-400">
+              <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" /> Loading…
+            </span>
+          <% end %>
+          <button
+            type="button"
+            phx-click="refresh_courses"
+            disabled={@status == :refreshing}
+            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:border-slate-500 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Refresh from Canvas
+          </button>
+        </div>
       </div>
       <%= if @courses == [] do %>
         <div class="px-6 py-10 text-center">

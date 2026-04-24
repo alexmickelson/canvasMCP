@@ -1,4 +1,4 @@
-defmodule CanvasMcpWeb.CanvasComponents.CanvasUserDisplay do
+defmodule CanvasMcpWeb.App.Profile do
   use Phoenix.Component
 
   attr :canvas_user, :map, required: true

@@ -1,4 +1,4 @@
-defmodule CanvasMcp.UserServersPG do
+defmodule CanvasMcp.UserActorsPG do
   @pg_scope CanvasMcp.UserPG
   @pg_group :user_servers
 

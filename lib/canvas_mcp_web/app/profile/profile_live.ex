@@ -1,17 +1,15 @@
-defmodule CanvasMcpWeb.HomeLive do
+defmodule CanvasMcpWeb.App.ProfileLive do
   use CanvasMcpWeb, :live_view
-  require Logger
-  alias CanvasMcp.UserServer
+  alias CanvasMcp.UserActor
 
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
-    {:ok, _pid} = UserServer.ensure_started(current_user.id)
+    {:ok, _pid} = UserActor.ensure_started(current_user.id)
 
     if connected?(socket) do
-      UserServer.subscribe_to_user(current_user.id)
-      UserServer.get_data(current_user.id)
-      UserServer.get_canvas_courses(current_user.id)
+      UserActor.subscribe_to_user(current_user.id)
+      UserActor.get_data(current_user.id)
     end
 
     socket =
@@ -20,7 +18,7 @@ defmodule CanvasMcpWeb.HomeLive do
       |> assign(:token_form, to_form(%{"canvas_token" => ""}))
       |> assign(:has_canvas_token, false)
       |> assign(:canvas_user, nil)
-      |> assign(:courses, [])
+      |> assign(:token_message, nil)
 
     {:ok, socket}
   end
@@ -35,59 +33,40 @@ defmodule CanvasMcpWeb.HomeLive do
 
   @impl true
   def handle_info({:canvas, :token_updated, user_data}, socket) do
-    flash_msg =
+    msg =
       cond do
         user_data.canvas_token && user_data.canvas_user ->
-          "Canvas token saved and linked to #{user_data.canvas_user.name}."
+          {:ok, "Linked to #{user_data.canvas_user.name}."}
 
         user_data.canvas_token ->
-          "Canvas token saved, but the token appears invalid."
+          {:error, "Token saved but appears invalid — check it and try again."}
 
         true ->
-          "Canvas token cleared."
+          {:ok, "Token cleared."}
       end
 
     {:noreply,
      socket
      |> assign_canvas_state(user_data)
      |> assign(:token_form, to_form(%{"canvas_token" => ""}))
-     |> put_flash(:info, flash_msg)}
-  end
-
-  @impl true
-  def handle_info({:canvas, :courses_refreshed, courses}, socket) do
-    {:noreply,
-     socket
-     |> assign(:courses, courses)
-     |> put_flash(:info, "Courses refreshed from Canvas.")}
-  end
-
-  @impl true
-  def handle_info({:canvas, :error, :no_canvas_token}, socket) do
-    {:noreply, put_flash(socket, :error, "No Canvas token configured.")}
+     |> assign(:token_message, msg)}
   end
 
   @impl true
   def handle_info({:canvas, :error, _reason}, socket) do
-    {:noreply, put_flash(socket, :error, "An error occurred. Please try again.")}
+    {:noreply, assign(socket, :token_message, {:error, "An error occurred. Please try again."})}
   end
 
   @impl true
   def handle_event("save_canvas_token", %{"canvas_token" => token}, socket) do
     token = if token == "", do: nil, else: token
-    UserServer.update_canvas_token(socket.assigns.current_user.id, token)
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("refresh_courses", _params, socket) do
-    UserServer.get_canvas_courses(socket.assigns.current_user.id, true)
+    UserActor.update_canvas_token(socket.assigns.current_user.id, token)
     {:noreply, socket}
   end
 
   @impl true
   def handle_event("clear_canvas_token", _params, socket) do
-    UserServer.update_canvas_token(socket.assigns.current_user.id, nil)
+    UserActor.update_canvas_token(socket.assigns.current_user.id, nil)
     {:noreply, socket}
   end
 
@@ -100,24 +79,17 @@ defmodule CanvasMcpWeb.HomeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
-      <div class="mx-auto max-w-2xl px-4 py-12">
-        <%!-- Page header --%>
-        <div class="mb-8 flex items-center justify-between">
-          <div>
-            <h1 class="text-2xl font-bold text-slate-50">Dashboard</h1>
-            <p class="mt-1 text-sm text-slate-400">Manage your account and integrations</p>
-          </div>
-          <.link
-            href={~p"/auth/logout"}
-            class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-600 active:scale-95 transition-all"
-          >
-            Logout
+    <Layouts.app flash={@flash} current_user={@current_user}>
+      <div class="max-w-lg w-full mx-auto py-8 px-4 space-y-5">
+        <div class="flex items-center gap-3 mb-2">
+          <.link navigate={~p"/app"} class="text-slate-400 hover:text-slate-200 transition-colors">
+            <.icon name="hero-arrow-left" class="size-5" />
           </.link>
+          <h1 class="text-lg font-semibold text-slate-100">Profile & Settings</h1>
         </div>
 
-        <%!-- User information card --%>
-        <div class="rounded-2xl border border-slate-700 bg-slate-800 shadow-lg mb-5">
+        <%!-- Account card --%>
+        <div class="rounded-2xl border border-slate-700 bg-slate-800 shadow-lg">
           <div class="px-6 py-4 border-b border-slate-700">
             <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Account</h2>
           </div>
@@ -146,9 +118,8 @@ defmodule CanvasMcpWeb.HomeLive do
           </div>
         </div>
 
+        <%!-- Canvas account card --%>
         <.canvas_user_display canvas_user={@canvas_user} />
-
-        <.all_courses courses={@courses} />
 
         <%!-- Canvas token card --%>
         <div class="rounded-2xl border border-slate-700 bg-slate-800 shadow-lg">
@@ -162,7 +133,6 @@ defmodule CanvasMcpWeb.HomeLive do
           </div>
           <div class="px-6 py-5">
             <%= if @has_canvas_token do %>
-              <%!-- Token is set — require clearing before replacing --%>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -177,7 +147,6 @@ defmodule CanvasMcpWeb.HomeLive do
                 </button>
               </div>
             <% else %>
-              <%!-- No token — show the form --%>
               <.form
                 for={@token_form}
                 id="canvas-token-form"
@@ -210,6 +179,23 @@ defmodule CanvasMcpWeb.HomeLive do
                   </button>
                 </div>
               </.form>
+            <% end %>
+            <%= if @token_message do %>
+              <p class={[
+                "mt-3 flex items-center gap-1.5 text-sm",
+                elem(@token_message, 0) == :ok && "text-emerald-400",
+                elem(@token_message, 0) == :error && "text-red-400"
+              ]}>
+                <.icon
+                  name={
+                    if elem(@token_message, 0) == :ok,
+                      do: "hero-check-circle",
+                      else: "hero-exclamation-circle"
+                  }
+                  class="size-4 shrink-0"
+                />
+                {elem(@token_message, 1)}
+              </p>
             <% end %>
           </div>
         </div>

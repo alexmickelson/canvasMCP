@@ -1,4 +1,4 @@
-defmodule CanvasMcpWeb.PageController do
+defmodule CanvasMcpWeb.Home.PageController do
   use CanvasMcpWeb, :controller
 
   def home(conn, _params) do
