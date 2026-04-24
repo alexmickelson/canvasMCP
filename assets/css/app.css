@@ -100,10 +100,198 @@
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 /* Make LiveView wrapper divs transparent for layout */
-[data-phx-session], [data-phx-teleported-src] { display: contents }
+[data-phx-session],
+[data-phx-teleported-src] {
+  display: contents;
+}
 
 /* This file is for your main application CSS */
 
 button {
   @apply cursor-pointer;
+}
+
+/* ─── Assignment pill tooltip ──────────────────────────────────────────────── */
+
+.pill-tooltip {
+  display: none;
+}
+.pill-wrapper:hover .pill-tooltip {
+  display: block;
+}
+
+/* ─── Assignment HTML body ─────────────────────────────────────────────────── */
+
+.assignment-body {
+  color: #cbd5e1; /* slate-300 */
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.assignment-body h1,
+.assignment-body h2,
+.assignment-body h3,
+.assignment-body h4,
+.assignment-body h5,
+.assignment-body h6 {
+  font-weight: 600;
+  color: #e2e8f0; /* slate-200 */
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+.assignment-body h1 {
+  font-size: 1.5rem;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 0.25rem;
+}
+.assignment-body h2 {
+  font-size: 1.25rem;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 0.25rem;
+}
+.assignment-body h3 {
+  font-size: 1.125rem;
+  color: #cbd5e1;
+}
+.assignment-body h4 {
+  font-size: 1rem;
+  color: #cbd5e1;
+}
+.assignment-body h5 {
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+.assignment-body h6 {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+}
+
+.assignment-body p {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.assignment-body a {
+  color: #818cf8; /* indigo-400 */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 150ms;
+}
+.assignment-body a:hover {
+  color: #a5b4fc; /* indigo-300 */
+}
+
+.assignment-body strong {
+  font-weight: 700;
+  color: #f1f5f9;
+}
+.assignment-body em {
+  font-style: italic;
+  color: #cbd5e1;
+}
+
+.assignment-body code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: #0f172a; /* slate-950 */
+  color: #a5b4fc; /* indigo-300 */
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  border: 1px solid #1e293b; /* slate-800 */
+}
+
+.assignment-body pre {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.assignment-body pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: #e2e8f0;
+}
+
+.assignment-body blockquote {
+  border-left: 2px solid #4f46e5; /* indigo-600 */
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  background: #0f172a;
+  color: #94a3b8;
+  border-radius: 0 0.375rem 0.375rem 0;
+  font-style: italic;
+}
+
+.assignment-body hr {
+  border: none;
+  border-top: 1px solid #1e293b;
+  margin: 1.5rem 0;
+}
+
+.assignment-body ul,
+.assignment-body ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+.assignment-body ul {
+  list-style-type: disc;
+}
+.assignment-body ol {
+  list-style-type: decimal;
+}
+.assignment-body li {
+  margin: 0.25rem 0;
+}
+.assignment-body li::marker {
+  color: #475569; /* slate-600 */
+}
+.assignment-body ul ul {
+  list-style-type: circle;
+}
+.assignment-body ul ul ul {
+  list-style-type: square;
+}
+
+.assignment-body table {
+  display: block;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  overflow-x: auto;
+}
+.assignment-body thead {
+  background: #0f172a;
+}
+.assignment-body th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+  border-bottom: 2px solid #334155;
+}
+.assignment-body td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #1e293b;
+  color: #e2e8f0;
+}
+.assignment-body tbody tr:hover {
+  background: #0f172a;
+}
+
+.assignment-body img {
+  max-width: 100%;
+  border-radius: 0.375rem;
+  border: 1px solid #1e293b;
+  margin: 0.5rem 0;
+}
+
+.assignment-body input[type="checkbox"] {
+  accent-color: #4f46e5;
+  margin-right: 0.25rem;
 }

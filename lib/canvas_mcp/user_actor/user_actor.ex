@@ -27,6 +27,29 @@ defmodule CanvasMcp.UserActor do
     GenServer.cast(via(user_id), {:canvas, {:get_canvas_courses, invalidate_cache}})
   end
 
+  def get_course_assignments(user_id, course_id) do
+    GenServer.cast(via(user_id), {:canvas, {:get_course_assignments, course_id}})
+  end
+
+  def refresh_course_assignments(user_id, course_id) do
+    GenServer.cast(via(user_id), {:canvas, {:refresh_course_assignments, course_id}})
+  end
+
+  def refresh_assignments_with_submissions(user_id, course_id) do
+    GenServer.cast(via(user_id), {:canvas, {:refresh_assignments_with_submissions, course_id}})
+  end
+
+  def get_assignment_submissions(user_id, assignment_id) do
+    GenServer.cast(via(user_id), {:canvas, {:get_assignment_submissions, assignment_id}})
+  end
+
+  def refresh_assignment_submissions(user_id, course_id, assignment_id) do
+    GenServer.cast(
+      via(user_id),
+      {:canvas, {:refresh_assignment_submissions, course_id, assignment_id}}
+    )
+  end
+
   def update_canvas_token(user_id, token) do
     GenServer.cast(via(user_id), {:profile, {:update_canvas_token, token}})
   end
@@ -58,12 +81,22 @@ defmodule CanvasMcp.UserActor do
             user_id: user_id,
             user: user,
             canvas_token: canvas_token,
-            canvas_user: load_canvas_user(user)
+            canvas_user: load_canvas_user(user),
+            assignments: %{},
+            submissions: %{}
           }
 
         {:error, reason} ->
           Logger.error("UserActor init failed for user_id=#{user_id}: #{inspect(reason)}")
-          %{user_id: user_id, user: nil, canvas_token: nil, canvas_user: nil}
+
+          %{
+            user_id: user_id,
+            user: nil,
+            canvas_token: nil,
+            canvas_user: nil,
+            assignments: %{},
+            submissions: %{}
+          }
       end
 
     {:ok, state}

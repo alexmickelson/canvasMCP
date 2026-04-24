@@ -95,6 +95,7 @@ defmodule CanvasMcpWeb do
       import CanvasMcpWeb.Components.JsCommands
       import CanvasMcpWeb.App.Courses
       import CanvasMcpWeb.App.Profile
+      import CanvasMcpWeb.DateHelpers
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS
