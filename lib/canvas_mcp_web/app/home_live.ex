@@ -5,8 +5,8 @@ defmodule CanvasMcpWeb.App.HomeLive do
   alias CanvasMcp.Data.User
 
   @impl true
-  def mount(_params, session, socket) do
-    current_user = session["current_user"]
+  def mount(_params, _session, socket) do
+    current_user = socket.assigns.current_user
     {:ok, _pid} = UserActor.ensure_started(current_user.id)
 
     if connected?(socket) do
@@ -17,7 +17,6 @@ defmodule CanvasMcpWeb.App.HomeLive do
 
     socket =
       socket
-      |> assign(:current_user, current_user)
       |> assign(:has_canvas_token, User.has_canvas_token?(current_user.id))
       |> assign(:courses, [])
       |> assign(:courses_status, nil)
@@ -61,7 +60,10 @@ defmodule CanvasMcpWeb.App.HomeLive do
 
   @impl true
   def handle_info({:canvas, event, data}, socket) do
-    Logger.debug("home_live page unhandled canvas event: #{inspect(event)} with data #{inspect(data)} for user_id=#{socket.assigns.current_user.id}")
+    Logger.debug(
+      "home_live page unhandled canvas event: #{inspect(event)} with data #{inspect(data)} for user_id=#{socket.assigns.current_user.id}"
+    )
+
     {:noreply, socket}
   end
 
@@ -79,7 +81,7 @@ defmodule CanvasMcpWeb.App.HomeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_user={@current_user}>
+    <Layouts.app flash={@flash} current_user={@current_user} notifications={@notifications}>
       <div class="px-6 py-8 space-y-6">
         <%= if not @has_canvas_token do %>
           <div class="rounded-xl border border-amber-700/40 bg-amber-950/20 px-5 py-4 flex items-start gap-3">

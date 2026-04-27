@@ -66,7 +66,7 @@ defmodule CanvasMcpWeb.AuthController do
         conn
         |> delete_session("return_to")
         |> put_session("oidc_claims", userinfo)
-        |> put_session("current_user", user_profile)
+        |> put_session("current_user_id", user_profile.id)
         |> redirect(to: return_to)
 
       {:error, reason} ->
@@ -105,13 +105,13 @@ defmodule CanvasMcpWeb.AuthController do
 
   def logout(conn, _params) do
     claims = get_session(conn, "oidc_claims")
-    current_user = get_session(conn, "current_user")
+    current_user_id = get_session(conn, "current_user_id")
 
     Logger.info(
       "User logout sub=#{claims && Map.get(claims, "sub")} email=#{claims && Map.get(claims, "email")} remote_ip=#{format_ip(conn.remote_ip)}"
     )
 
-    AuditLog.record(:logout, current_user && current_user.id, format_ip(conn.remote_ip), %{
+    AuditLog.record(:logout, current_user_id, format_ip(conn.remote_ip), %{
       email: claims && Map.get(claims, "email")
     })
 

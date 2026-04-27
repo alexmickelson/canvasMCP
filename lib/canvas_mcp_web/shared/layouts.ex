@@ -6,6 +6,7 @@ defmodule CanvasMcpWeb.Layouts do
   attr :flash, :map, required: true
   attr :current_scope, :map, default: nil
   attr :current_user, :map, default: nil
+  attr :notifications, :list, default: []
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -41,6 +42,30 @@ defmodule CanvasMcpWeb.Layouts do
       <main class="flex-1 overflow-y-auto">
         {render_slot(@inner_block)}
       </main>
+    </div>
+    <%!-- Toast notifications --%>
+    <div
+      id="user-notifications"
+      aria-live="assertive"
+      class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
+    >
+      <%= for notif <- @notifications do %>
+        <div
+          id={"notif-#{notif.id}"}
+          class="pointer-events-auto flex items-start gap-3 rounded-lg bg-slate-800 border border-red-500/30 shadow-xl px-4 py-3 max-w-sm w-full"
+        >
+          <.icon name="hero-exclamation-circle" class="size-4 text-red-400 shrink-0 mt-0.5" />
+          <p class="text-sm text-slate-200 flex-1 leading-snug">{notif.message}</p>
+          <button
+            phx-click="dismiss_notification"
+            phx-value-id={notif.id}
+            class="text-slate-500 hover:text-slate-300 transition-colors shrink-0 ml-1"
+            aria-label="Dismiss"
+          >
+            <.icon name="hero-x-mark" class="size-3.5" />
+          </button>
+        </div>
+      <% end %>
     </div>
     <.flash_group flash={@flash} />
     """

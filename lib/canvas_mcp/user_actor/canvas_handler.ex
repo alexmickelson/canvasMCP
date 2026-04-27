@@ -5,6 +5,7 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
   alias CanvasMcp.Canvas.Assignment
   alias CanvasMcp.Canvas.Enrollment
   alias CanvasMcp.Canvas.Submission
+  alias CanvasMcp.Canvas.Rubric
   alias CanvasMcp.UserActor.Helpers
 
   def handle({:get_canvas_courses, _}, %{canvas_token: nil} = state) do
@@ -198,6 +199,44 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
         %{canvas_token: nil} = state
       ) do
     Helpers.broadcast(state.user_id, {:canvas, :error, :no_canvas_token})
+    {:noreply, state}
+  end
+
+  def handle(
+        {:get_rubric_for_assignment, _course_id, _assignment_id},
+        %{canvas_token: nil} = state
+      ) do
+    {:noreply, state}
+  end
+
+  def handle(
+        {:get_rubric_for_assignment, course_id, assignment_id},
+        %{canvas_token: token} = state
+      ) do
+    case Rubric.get_for_assignment(assignment_id) do
+      {:ok, rubric} ->
+        Helpers.broadcast(state.user_id, {:canvas, :rubric_loaded, {assignment_id, rubric}})
+
+      _ ->
+        case Rubric.fetch_and_store_for_assignment(course_id, assignment_id, token) do
+          {:ok, rubric} ->
+            Helpers.broadcast(state.user_id, {:canvas, :rubric_loaded, {assignment_id, rubric}})
+
+          {:error, {:parse_error, _} = reason} ->
+            Logger.warning(
+              "Rubric parse failed for assignment #{assignment_id}: #{inspect(reason)}"
+            )
+
+            Helpers.broadcast_error(
+              state.user_id,
+              "Failed to load rubric — Canvas returned data in an unexpected format."
+            )
+
+          {:error, reason} ->
+            Logger.debug("No rubric for assignment #{assignment_id}: #{inspect(reason)}")
+        end
+    end
+
     {:noreply, state}
   end
 

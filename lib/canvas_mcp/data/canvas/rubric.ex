@@ -16,22 +16,28 @@ defmodule CanvasMcp.Canvas.Rubric do
       hide_score_total: Zoi.nullish(Zoi.boolean()),
       data:
         Zoi.list(
-          Zoi.object(%{
-            id: Zoi.string(),
-            description: Zoi.optional(Zoi.string()),
-            long_description: Zoi.optional(Zoi.string()),
-            points: Zoi.float(coerce: true),
-            criterion_use_range: Zoi.optional(Zoi.boolean()),
-            ratings:
-              Zoi.list(
-                Zoi.object(%{
-                  id: Zoi.string(),
-                  description: Zoi.optional(Zoi.string()),
-                  long_description: Zoi.optional(Zoi.string()),
-                  points: Zoi.float(coerce: true)
-                })
-              )
-          })
+          Zoi.object(
+            %{
+              id: Zoi.string(),
+              description: Zoi.optional(Zoi.string()),
+              long_description: Zoi.optional(Zoi.string()),
+              points: Zoi.float(coerce: true),
+              criterion_use_range: Zoi.optional(Zoi.boolean()),
+              ratings:
+                Zoi.list(
+                  Zoi.object(
+                    %{
+                      id: Zoi.string(),
+                      description: Zoi.optional(Zoi.string()),
+                      long_description: Zoi.optional(Zoi.string()),
+                      points: Zoi.float(coerce: true)
+                    },
+                    coerce: true
+                  )
+                )
+            },
+            coerce: true
+          )
         )
     })
   end
@@ -41,9 +47,7 @@ defmodule CanvasMcp.Canvas.Rubric do
            Client.get_one("/courses/#{course_id}/assignments/#{assignment_id}", token),
          {:ok, rubric_id} <- extract_rubric_id(assignment_raw),
          {:ok, raw_rubric} <-
-           Client.get_one("/courses/#{course_id}/rubrics/#{rubric_id}", token, [
-             {"include[]", "associations"}
-           ]) do
+           Client.get_one("/courses/#{course_id}/rubrics/#{rubric_id}", token) do
       case Zoi.parse(schema(), raw_rubric, coerce: true) do
         {:ok, rubric} ->
           case store(rubric, course_id, assignment_id) do
@@ -52,7 +56,10 @@ defmodule CanvasMcp.Canvas.Rubric do
           end
 
         {:error, errors} ->
-          Logger.error("Failed to parse rubric #{rubric_id}: #{inspect(errors)}")
+          Logger.error(
+            "Failed to parse rubric #{rubric_id}: #{inspect(errors)}\nRaw data[0]: #{inspect(raw_rubric["data"] && List.first(raw_rubric["data"]))}"
+          )
+
           {:error, {:parse_error, errors}}
       end
     end
@@ -88,7 +95,7 @@ defmodule CanvasMcp.Canvas.Rubric do
     VALUES ($(id), $(course_id), $(assignment_id), $(canvas_object)::jsonb, NOW())
     ON CONFLICT (id) DO UPDATE SET
       course_id     = EXCLUDED.course_id,
-      assignment_id = EXCLUDED.assignment_id,
+      assignment_id = COALESCE(EXCLUDED.assignment_id, canvas_rubrics.assignment_id),
       canvas_object = EXCLUDED.canvas_object,
       updated_at    = EXCLUDED.updated_at
     """
@@ -165,6 +172,10 @@ defmodule CanvasMcp.Canvas.Rubric do
   end
 
   defp extract_rubric_id(%{"rubric_settings" => %{"id" => rubric_id}})
+       when not is_nil(rubric_id),
+       do: {:ok, rubric_id}
+
+  defp extract_rubric_id(%{"rubric_id" => rubric_id})
        when not is_nil(rubric_id),
        do: {:ok, rubric_id}
 

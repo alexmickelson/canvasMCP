@@ -4,9 +4,7 @@ defmodule CanvasMcpWeb.Admin.AuditLogLive do
   alias CanvasMcp.Data.AuditLog
 
   @impl true
-  def mount(_params, session, socket) do
-    current_user = session["current_user"]
-
+  def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(CanvasMcp.PubSub, AuditLog.topic())
     end
@@ -23,7 +21,6 @@ defmodule CanvasMcpWeb.Admin.AuditLogLive do
 
     socket =
       socket
-      |> assign(:current_user, current_user)
       |> stream(:entries, entries)
 
     {:ok, socket}

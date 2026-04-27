@@ -62,6 +62,13 @@ defmodule CanvasMcp.UserActor do
     )
   end
 
+  def get_rubric_for_assignment(user_id, course_id, assignment_id) do
+    GenServer.cast(
+      via(user_id),
+      {:canvas, {:get_rubric_for_assignment, course_id, assignment_id}}
+    )
+  end
+
   def update_canvas_token(user_id, token) do
     GenServer.cast(via(user_id), {:profile, {:update_canvas_token, token}})
   end

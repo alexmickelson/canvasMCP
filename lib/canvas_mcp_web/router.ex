@@ -32,7 +32,10 @@ defmodule CanvasMcpWeb.Router do
     pipe_through [:browser, :require_authenticated]
 
     live_session :authenticated,
-      on_mount: [] do
+      on_mount: [
+        {CanvasMcpWeb.UserAuth, :ensure_authenticated},
+        {CanvasMcpWeb.UserNotifications, :default}
+      ] do
       live "/app", HomeLive
       live "/app/profile", ProfileLive
       live "/app/courses/:course_id", Courses.CourseLive
@@ -44,7 +47,7 @@ defmodule CanvasMcpWeb.Router do
     pipe_through [:browser, :require_admin]
 
     live_session :admin,
-      on_mount: [] do
+      on_mount: [{CanvasMcpWeb.UserAuth, :ensure_authenticated}] do
       live "/", AuditLogLive
     end
   end
@@ -73,7 +76,7 @@ defmodule CanvasMcpWeb.Router do
   end
 
   defp require_authenticated_user(conn, _opts) do
-    if get_session(conn, "current_user") do
+    if get_session(conn, "current_user_id") do
       conn
     else
       conn
@@ -84,9 +87,15 @@ defmodule CanvasMcpWeb.Router do
   end
 
   defp require_admin_user(conn, _opts) do
-    user = get_session(conn, "current_user")
+    user_id = get_session(conn, "current_user_id")
 
-    if user && user.is_admin do
+    is_admin =
+      case user_id && CanvasMcp.Data.User.get_by_id(user_id) do
+        {:ok, user} -> user.is_admin
+        _ -> false
+      end
+
+    if is_admin do
       conn
     else
       conn

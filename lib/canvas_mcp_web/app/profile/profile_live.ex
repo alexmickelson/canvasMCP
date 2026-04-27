@@ -3,8 +3,8 @@ defmodule CanvasMcpWeb.App.ProfileLive do
   alias CanvasMcp.UserActor
 
   @impl true
-  def mount(_params, session, socket) do
-    current_user = session["current_user"]
+  def mount(_params, _session, socket) do
+    current_user = socket.assigns.current_user
     {:ok, _pid} = UserActor.ensure_started(current_user.id)
 
     if connected?(socket) do
@@ -14,7 +14,6 @@ defmodule CanvasMcpWeb.App.ProfileLive do
 
     socket =
       socket
-      |> assign(:current_user, current_user)
       |> assign(:token_form, to_form(%{"canvas_token" => ""}))
       |> assign(:has_canvas_token, false)
       |> assign(:canvas_user, nil)
@@ -79,7 +78,7 @@ defmodule CanvasMcpWeb.App.ProfileLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_user={@current_user}>
+    <Layouts.app flash={@flash} current_user={@current_user} notifications={@notifications}>
       <div class="max-w-lg w-full mx-auto py-8 px-4 space-y-5">
         <div class="flex items-center gap-3 mb-2">
           <.link navigate={~p"/app"} class="text-slate-400 hover:text-slate-200 transition-colors">

@@ -6,8 +6,8 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
   import CanvasMcpWeb.App.Courses.CourseCalendar
 
   @impl true
-  def mount(%{"course_id" => id}, session, socket) do
-    current_user = session["current_user"]
+  def mount(%{"course_id" => id}, _session, socket) do
+    current_user = socket.assigns.current_user
     {:ok, _pid} = UserActor.ensure_started(current_user.id)
 
     course_id = String.to_integer(id)
@@ -28,7 +28,6 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
 
     socket =
       socket
-      |> assign(:current_user, current_user)
       |> assign(:course_id, course_id)
       |> assign(:course, course)
       |> assign(:canvas_course_url, "#{canvas_base_url}/courses/#{course_id}")
@@ -103,7 +102,7 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_user={@current_user}>
+    <Layouts.app flash={@flash} current_user={@current_user} notifications={@notifications}>
       <div class="px-6 py-8 max-w-7xl mx-auto space-y-6">
         <div class="flex items-center justify-between gap-4">
           <div class="flex items-center gap-3 min-w-0">
