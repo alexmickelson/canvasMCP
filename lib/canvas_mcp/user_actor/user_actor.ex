@@ -43,6 +43,18 @@ defmodule CanvasMcp.UserActor do
     GenServer.cast(via(user_id), {:canvas, {:get_assignment_submissions, assignment_id}})
   end
 
+  def broadcast_cached_submissions(user_id, assignment_ids) do
+    GenServer.cast(via(user_id), {:canvas, {:broadcast_cached_submissions, assignment_ids}})
+  end
+
+  def get_course_enrollments(user_id, course_id) do
+    GenServer.cast(via(user_id), {:canvas, {:get_course_enrollments, course_id}})
+  end
+
+  def refresh_course_enrollments(user_id, course_id) do
+    GenServer.cast(via(user_id), {:canvas, {:refresh_course_enrollments, course_id}})
+  end
+
   def refresh_assignment_submissions(user_id, course_id, assignment_id) do
     GenServer.cast(
       via(user_id),
@@ -83,7 +95,8 @@ defmodule CanvasMcp.UserActor do
             canvas_token: canvas_token,
             canvas_user: load_canvas_user(user),
             assignments: %{},
-            submissions: %{}
+            submissions: %{},
+            enrollments: %{}
           }
 
         {:error, reason} ->
@@ -95,7 +108,8 @@ defmodule CanvasMcp.UserActor do
             canvas_token: nil,
             canvas_user: nil,
             assignments: %{},
-            submissions: %{}
+            submissions: %{},
+            enrollments: %{}
           }
       end
 

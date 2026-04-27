@@ -15,6 +15,7 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
     if connected?(socket) do
       UserActor.subscribe_to_user(current_user.id)
       UserActor.get_assignment_submissions(current_user.id, assignment_id)
+      UserActor.get_course_enrollments(current_user.id, course_id)
     end
 
     assignment =
@@ -23,13 +24,21 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
         _ -> nil
       end
 
+    canvas_base_url = System.get_env("CANVAS_BASE_URL", "https://snow.instructure.com")
+
     socket =
       socket
       |> assign(:current_user, current_user)
       |> assign(:course_id, course_id)
       |> assign(:assignment_id, assignment_id)
       |> assign(:assignment, assignment)
+      |> assign(
+        :canvas_assignment_url,
+        "#{canvas_base_url}/courses/#{course_id}/assignments/#{assignment_id}"
+      )
+      |> assign(:submissions_all, [])
       |> assign(:submissions_list, [])
+      |> assign(:active_student_ids, nil)
       |> assign(:submissions_status, nil)
 
     {:ok, socket}
@@ -43,10 +52,28 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
   @impl true
   def handle_info({:canvas, :submissions_loaded, {assignment_id, submissions}}, socket) do
     if assignment_id == socket.assigns.assignment_id do
-      {:noreply,
-       socket
-       |> assign(:submissions_status, :loaded)
-       |> assign(:submissions_list, submissions)}
+      socket =
+        socket
+        |> assign(:submissions_status, :loaded)
+        |> assign(:submissions_all, submissions)
+        |> apply_enrollment_filter()
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:canvas, :enrollments_loaded, {course_id, enrollments}}, socket) do
+    if course_id == socket.assigns.course_id do
+      active_ids =
+        enrollments
+        |> Enum.filter(&(&1.enrollment_state == "active" and &1.type == "StudentEnrollment"))
+        |> MapSet.new(& &1.user_id)
+
+      socket = socket |> assign(:active_student_ids, active_ids) |> apply_enrollment_filter()
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -65,11 +92,21 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
     {:noreply, assign(socket, :submissions_status, :refreshing)}
   end
 
+  defp apply_enrollment_filter(socket) do
+    filtered =
+      case socket.assigns.active_student_ids do
+        nil -> socket.assigns.submissions_all
+        ids -> Enum.filter(socket.assigns.submissions_all, &MapSet.member?(ids, &1.user_id))
+      end
+
+    assign(socket, :submissions_list, filtered)
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div class="px-6 py-8 max-w-4xl mx-auto space-y-6">
+      <div class="px-6 py-8  mx-auto space-y-6">
         <%!-- Breadcrumb --%>
         <div class="flex items-center gap-2 text-xs">
           <.link
@@ -98,6 +135,7 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
           <div class="space-y-3">
             <div class="flex items-start justify-between gap-4">
               <h1 class="text-xl font-bold text-slate-100 leading-snug">{@assignment.name}</h1>
+              <.canvas_link text="View in Canvas" destination={@canvas_assignment_url} />
               <span class={[
                 "shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
                 @assignment.published && "bg-emerald-500/15 text-emerald-400",

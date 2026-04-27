@@ -15,6 +15,7 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
     if connected?(socket) do
       UserActor.subscribe_to_user(current_user.id)
       UserActor.get_course_assignments(current_user.id, course_id)
+      UserActor.get_course_enrollments(current_user.id, course_id)
     end
 
     course =
@@ -23,14 +24,18 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
         _ -> nil
       end
 
+    canvas_base_url = System.get_env("CANVAS_BASE_URL", "https://snow.instructure.com")
+
     socket =
       socket
       |> assign(:current_user, current_user)
       |> assign(:course_id, course_id)
       |> assign(:course, course)
+      |> assign(:canvas_course_url, "#{canvas_base_url}/courses/#{course_id}")
       |> assign(:assignments_status, nil)
       |> assign(:assignments_list, [])
       |> assign(:submissions_map, %{})
+      |> assign(:active_student_ids, nil)
       |> stream(:assignments, [])
 
     {:ok, socket}
@@ -44,6 +49,13 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
   @impl true
   def handle_info({:canvas, :assignments_loaded, {course_id, assignments}}, socket) do
     if course_id == socket.assigns.course_id do
+      assignment_ids = Enum.map(assignments, & &1.id)
+
+      UserActor.broadcast_cached_submissions(
+        socket.assigns.current_user.id,
+        assignment_ids
+      )
+
       {:noreply,
        socket
        |> assign(:assignments_status, :loaded)
@@ -55,6 +67,30 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
   end
 
   @impl true
+  def handle_info({:canvas, :submissions_loaded, {assignment_id, submissions}}, socket) do
+    {:noreply, update(socket, :submissions_map, &Map.put(&1, assignment_id, submissions))}
+  end
+
+  @impl true
+  def handle_info({:canvas, :enrollments_loaded, {course_id, enrollments}}, socket) do
+    if course_id == socket.assigns.course_id do
+      active_ids =
+        enrollments
+        |> Enum.filter(&(&1.enrollment_state == "active" and &1.type == "StudentEnrollment"))
+        |> MapSet.new(& &1.user_id)
+
+      {:noreply, assign(socket, :active_student_ids, active_ids)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:canvas, _event, _data}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("refresh_assignments", _params, socket) do
     UserActor.refresh_assignments_with_submissions(
       socket.assigns.current_user.id,
@@ -62,16 +98,6 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
     )
 
     {:noreply, assign(socket, :assignments_status, :refreshing)}
-  end
-
-  @impl true
-  def handle_info({:canvas, :submissions_loaded, {assignment_id, submissions}}, socket) do
-    {:noreply, update(socket, :submissions_map, &Map.put(&1, assignment_id, submissions))}
-  end
-
-  @impl true
-  def handle_info({:canvas, _event, _data}, socket) do
-    {:noreply, socket}
   end
 
   @impl true
@@ -109,30 +135,53 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
             <% end %>
           </div>
           <div class="flex items-center gap-3 shrink-0">
-            <%= if @assignments_status == :loaded do %>
-              <span class="text-xs text-emerald-400">Updated</span>
-            <% end %>
-            <button
-              type="button"
-              phx-click="refresh_assignments"
-              disabled={@assignments_status == :refreshing}
-              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:border-slate-500 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg
-                class={["w-3.5 h-3.5", @assignments_status == :refreshing && "animate-spin"]}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
+            <.canvas_link text="View in Canvas" destination={@canvas_course_url} />
+            <%= if @current_user.canvas_user_id do %>
+              <%= if @assignments_status == :loaded do %>
+                <span class="text-xs text-emerald-400">Updated</span>
+              <% end %>
+              <button
+                type="button"
+                phx-click="refresh_assignments"
+                disabled={@assignments_status == :refreshing}
+                class="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:border-slate-500 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              {if @assignments_status == :refreshing, do: "Loading…", else: "Refresh"}
-            </button>
+                <svg
+                  class={["w-3.5 h-3.5", @assignments_status == :refreshing && "animate-spin"]}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                {if @assignments_status == :refreshing, do: "Loading…", else: "Refresh"}
+              </button>
+            <% else %>
+              <.link
+                navigate="/app/profile"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-amber-700/50 bg-amber-950/30 px-3 py-1.5 text-xs font-semibold text-amber-400 hover:bg-amber-900/40 hover:border-amber-600 transition-all"
+              >
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  />
+                </svg>
+                Connect Canvas token to refresh
+              </.link>
+            <% end %>
           </div>
         </div>
 
@@ -140,6 +189,7 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
           assignments={@assignments_list}
           course_id={@course_id}
           submissions_map={@submissions_map}
+          active_student_ids={@active_student_ids}
         />
       </div>
     </Layouts.app>

@@ -4,9 +4,16 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentInCalendarDay do
   attr :assignment, :map, required: true
   attr :course_id, :integer, required: true
   attr :submissions, :list, default: []
+  attr :active_student_ids, :any, default: nil
 
   def assignment_in_calendar_day(assigns) do
-    assigns = assign(assigns, :bar, submission_bar(assigns.submissions))
+    active_submissions =
+      case assigns.active_student_ids do
+        nil -> assigns.submissions
+        ids -> Enum.filter(assigns.submissions, &MapSet.member?(ids, &1.user_id))
+      end
+
+    assigns = assign(assigns, :bar, submission_bar(active_submissions))
 
     ~H"""
     <div class="relative pill-wrapper">
@@ -28,13 +35,13 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentInCalendarDay do
           <%!-- Graded segment — emerald-400, highest lightness --%>
           <div
             :if={@bar.graded_pct > 0}
-            class="h-full bg-emerald-400"
+            class="h-full bg-emerald-800"
             style={"width: #{@bar.graded_pct}%"}
           />
           <%!-- Submitted-but-ungraded segment — sky-500, medium lightness --%>
           <div
             :if={@bar.ungraded_pct > 0}
-            class="h-full bg-sky-500"
+            class="h-full bg-sky-800"
             style={"width: #{@bar.ungraded_pct}%"}
           />
           <%!-- Remainder — slate-600/50, lowest lightness --%>
@@ -46,24 +53,24 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentInCalendarDay do
       <%= if @bar.total > 0 do %>
         <div class="pill-tooltip pointer-events-none absolute bottom-full left-0 mb-1.5 z-50">
           <div class="rounded-lg bg-slate-900 border border-slate-700 shadow-xl px-3 py-2 space-y-1.5 min-w-[140px]">
-            <p class="text-xs font-semibold text-slate-200 truncate">{@assignment.name}</p>
+            <p class=" font-semibold text-slate-200 truncate">{@assignment.name}</p>
             <div class="space-y-1">
               <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-sm bg-emerald-400 shrink-0"></span>
-                <span class="text-xs text-slate-400">Graded</span>
-                <span class="ml-auto text-xs font-mono font-semibold text-emerald-400">
+                <span class="w-2 h-2 rounded-sm bg-emerald-300 shrink-0"></span>
+                <span class="w-10 text-end font-mono font-semibold text-emerald-200">
                   {@bar.graded_pct}%
                 </span>
+                <span class=" text-slate-400">Graded</span>
               </div>
               <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-sm bg-sky-500 shrink-0"></span>
-                <span class="text-xs text-slate-400">Submitted</span>
-                <span class="ml-auto text-xs font-mono font-semibold text-sky-400">
+                <span class="w-2 h-2 rounded-sm bg-sky-300 shrink-0"></span>
+                <span class="w-10 text-end font-mono font-semibold text-sky-200 ">
                   {@bar.ungraded_pct}%
                 </span>
+                <span class=" text-slate-400">Submitted</span>
               </div>
             </div>
-            <p class="text-xs text-slate-600 pt-0.5 border-t border-slate-800">
+            <p class=" text-slate-600 pt-0.5 border-t border-slate-800">
               {@bar.total} total
             </p>
           </div>

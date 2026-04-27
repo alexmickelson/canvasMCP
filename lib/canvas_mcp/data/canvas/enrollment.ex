@@ -47,19 +47,21 @@ defmodule CanvasMcp.Canvas.Enrollment do
 
   def store(enrollment) do
     sql = """
-    INSERT INTO canvas_enrollments (id, course_id, user_id, canvas_object, updated_at)
-    VALUES ($(id), $(course_id), $(user_id), $(canvas_object)::jsonb, NOW())
+    INSERT INTO canvas_enrollments (id, course_id, user_id, enrollment_state, canvas_object, updated_at)
+    VALUES ($(id), $(course_id), $(user_id), $(enrollment_state), $(canvas_object)::jsonb, NOW())
     ON CONFLICT (id) DO UPDATE SET
-      course_id     = EXCLUDED.course_id,
-      user_id       = EXCLUDED.user_id,
-      canvas_object = EXCLUDED.canvas_object,
-      updated_at    = EXCLUDED.updated_at
+      course_id        = EXCLUDED.course_id,
+      user_id          = EXCLUDED.user_id,
+      enrollment_state = EXCLUDED.enrollment_state,
+      canvas_object    = EXCLUDED.canvas_object,
+      updated_at       = EXCLUDED.updated_at
     """
 
     params = %{
       "id" => enrollment.id,
       "course_id" => enrollment.course_id,
       "user_id" => enrollment.user_id,
+      "enrollment_state" => enrollment.enrollment_state,
       "canvas_object" => enrollment
     }
 
@@ -115,6 +117,21 @@ defmodule CanvasMcp.Canvas.Enrollment do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
       [row | _] -> parse_canvas_object(row)
+    end
+  end
+
+  def active_student_ids_for_course(course_id) do
+    sql = """
+    SELECT user_id
+    FROM canvas_enrollments
+    WHERE course_id = $(course_id)
+      AND enrollment_state = 'active'
+      AND canvas_object->>'type' = 'StudentEnrollment'
+    """
+
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+      {:error, reason} -> {:error, reason}
+      rows -> {:ok, MapSet.new(rows, fn %{"user_id" => id} -> id end)}
     end
   end
 

@@ -9,6 +9,7 @@ defmodule CanvasMcpWeb.App.Courses.CourseCalendar do
   attr :assignments, :list, required: true
   attr :course_id, :integer, required: true
   attr :submissions_map, :map, default: %{}
+  attr :active_student_ids, :any, default: nil
 
   def course_calendar(assigns) do
     months = build_months(assigns.assignments)
@@ -65,6 +66,7 @@ defmodule CanvasMcpWeb.App.Courses.CourseCalendar do
                             assignment={assignment}
                             course_id={@course_id}
                             submissions={Map.get(@submissions_map, assignment.id, [])}
+                            active_student_ids={@active_student_ids}
                           />
                         <% end %>
                       <% end %>

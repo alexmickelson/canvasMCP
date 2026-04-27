@@ -43,13 +43,15 @@ CREATE TABLE IF NOT EXISTS canvas_enrollments (
   id               BIGINT      PRIMARY KEY,
   course_id        BIGINT      NOT NULL REFERENCES canvas_courses(id) ON DELETE CASCADE,
   user_id          BIGINT      NOT NULL,
+  enrollment_state TEXT,
   canvas_object    JSONB       NOT NULL,
   fetched_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS canvas_enrollments_course_id_idx ON canvas_enrollments(course_id);
-CREATE INDEX IF NOT EXISTS canvas_enrollments_user_id_idx   ON canvas_enrollments(user_id);
+CREATE INDEX IF NOT EXISTS canvas_enrollments_course_id_idx       ON canvas_enrollments(course_id);
+CREATE INDEX IF NOT EXISTS canvas_enrollments_user_id_idx         ON canvas_enrollments(user_id);
+CREATE INDEX IF NOT EXISTS canvas_enrollments_enrollment_state_idx ON canvas_enrollments(enrollment_state);
 
 CREATE TABLE IF NOT EXISTS canvas_assignments (
   id            BIGINT      PRIMARY KEY,

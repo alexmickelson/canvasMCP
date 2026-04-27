@@ -93,6 +93,7 @@ defmodule CanvasMcpWeb do
       import CanvasMcpWeb.Components.List
       import CanvasMcpWeb.Components.Icon
       import CanvasMcpWeb.Components.JsCommands
+      import CanvasMcpWeb.Components.CanvasLink
       import CanvasMcpWeb.App.Courses
       import CanvasMcpWeb.App.Profile
       import CanvasMcpWeb.DateHelpers
