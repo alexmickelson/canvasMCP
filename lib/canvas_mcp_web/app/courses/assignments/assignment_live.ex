@@ -1,8 +1,6 @@
 defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
   use CanvasMcpWeb, :live_view
   alias CanvasMcp.UserActor
-  alias CanvasMcp.Canvas.Assignment
-  alias CanvasMcp.Canvas.Rubric
   alias CanvasMcpWeb.Layouts
   import CanvasMcpWeb.App.Courses.SubmissionsPanel
   @impl true
@@ -15,22 +13,11 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
 
     if connected?(socket) do
       UserActor.subscribe_to_user(current_user.id)
+      UserActor.get_assignment(current_user.id, assignment_id)
       UserActor.get_assignment_submissions(current_user.id, assignment_id)
       UserActor.get_course_enrollments(current_user.id, course_id)
       UserActor.get_rubric_for_assignment(current_user.id, course_id, assignment_id)
     end
-
-    assignment =
-      case Assignment.get_by_id(assignment_id) do
-        {:ok, a} -> a
-        _ -> nil
-      end
-
-    rubric =
-      case Rubric.get_for_assignment(assignment_id) do
-        {:ok, r} -> r
-        _ -> nil
-      end
 
     canvas_base_url = System.get_env("CANVAS_BASE_URL", "https://snow.instructure.com")
 
@@ -38,12 +25,12 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
       socket
       |> assign(:course_id, course_id)
       |> assign(:assignment_id, assignment_id)
-      |> assign(:assignment, assignment)
+      |> assign(:assignment, nil)
       |> assign(
         :canvas_assignment_url,
         "#{canvas_base_url}/courses/#{course_id}/assignments/#{assignment_id}"
       )
-      |> assign(:rubric, rubric)
+      |> assign(:rubric, nil)
       |> assign(:selected_submission_id, nil)
       |> assign(:submissions_all, [])
       |> assign(:submissions_list, [])
@@ -56,6 +43,15 @@ defmodule CanvasMcpWeb.App.Courses.AssignmentLive do
   @impl true
   def handle_params(_params, _uri, socket) do
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:canvas, :assignment_loaded, assignment}, socket) do
+    if assignment.id == socket.assigns.assignment_id do
+      {:noreply, assign(socket, :assignment, assignment)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true

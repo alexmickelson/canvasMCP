@@ -27,11 +27,11 @@ defmodule CanvasMcp.Canvas.Course do
     })
   end
 
-  def get_all_courses(token, invalidate_cache \\ false)
+  def get_all_courses(token, invalidate_cache, canvas_user_id)
 
-  def get_all_courses(_token, false), do: list_all()
+  def get_all_courses(_token, false, canvas_user_id), do: list_all(canvas_user_id)
 
-  def get_all_courses(token, true) do
+  def get_all_courses(token, true, canvas_user_id) do
     with {:ok, raw_courses} <- Client.get("/courses", token, [{"include[]", "term"}]) do
       courses =
         raw_courses
@@ -50,20 +50,21 @@ defmodule CanvasMcp.Canvas.Course do
           end
         end)
 
-      case store_all(courses) do
+      case store_all(courses, canvas_user_id) do
         :ok -> {:ok, courses}
         err -> err
       end
     end
   end
 
-  def store(course) do
+  def store(course, canvas_user_id) do
     term = Map.get(course, :term)
 
     sql = """
-    INSERT INTO canvas_courses (id, term_id, term_name, canvas_object, updated_at)
-    VALUES ($(id), $(term_id), $(term_name), $(canvas_object)::jsonb, NOW())
+    INSERT INTO canvas_courses (id, canvas_user_id, term_id, term_name, canvas_object, updated_at)
+    VALUES ($(id), $(canvas_user_id), $(term_id), $(term_name), $(canvas_object)::jsonb, NOW())
     ON CONFLICT (id) DO UPDATE SET
+      canvas_user_id = EXCLUDED.canvas_user_id,
       term_id       = EXCLUDED.term_id,
       term_name     = EXCLUDED.term_name,
       canvas_object = EXCLUDED.canvas_object,
@@ -72,6 +73,7 @@ defmodule CanvasMcp.Canvas.Course do
 
     params = %{
       "id" => course.id,
+      "canvas_user_id" => canvas_user_id,
       "term_id" => term && term.id,
       "term_name" => term && term.name,
       "canvas_object" => course
@@ -83,40 +85,47 @@ defmodule CanvasMcp.Canvas.Course do
     end
   end
 
-  def store_all([]), do: :ok
+  def store_all([], _canvas_user_id), do: :ok
 
-  def store_all(courses) do
+  def store_all(courses, canvas_user_id) do
     Enum.reduce_while(courses, :ok, fn course, :ok ->
-      case store(course) do
+      case store(course, canvas_user_id) do
         :ok -> {:cont, :ok}
         err -> {:halt, err}
       end
     end)
   end
 
-  def list_all do
-    sql = "SELECT canvas_object FROM canvas_courses ORDER BY updated_at DESC"
+  def list_all(canvas_user_id) do
+    sql = """
+    SELECT canvas_object FROM canvas_courses
+    WHERE canvas_user_id = $(canvas_user_id)
+    ORDER BY updated_at DESC
+    """
 
-    case DbHelpers.run_sql(sql, %{}) do
+    case DbHelpers.run_sql(sql, %{"canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       rows -> {:ok, parse_rows(rows)}
     end
   end
 
-  def get_by_id(course_id) do
-    sql = "SELECT canvas_object FROM canvas_courses WHERE id = $(id)"
+  def get_by_id(course_id, canvas_user_id) do
+    sql = """
+    SELECT canvas_object FROM canvas_courses
+    WHERE id = $(id) AND canvas_user_id = $(canvas_user_id)
+    """
 
-    case DbHelpers.run_sql(sql, %{"id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
       [row | _] -> parse_canvas_object(row)
     end
   end
 
-  def delete(course_id) do
-    sql = "DELETE FROM canvas_courses WHERE id = $(id)"
+  def delete(course_id, canvas_user_id) do
+    sql = "DELETE FROM canvas_courses WHERE id = $(id) AND canvas_user_id = $(canvas_user_id)"
 
-    case DbHelpers.run_sql(sql, %{"id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       _ -> :ok
     end

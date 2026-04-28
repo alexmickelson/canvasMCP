@@ -137,63 +137,101 @@ defmodule CanvasMcp.Canvas.Submission do
     end)
   end
 
-  def list_for_assignment(assignment_id) do
+  def list_for_assignment(assignment_id, canvas_user_id) do
     sql = """
-    SELECT canvas_object
-    FROM canvas_submissions
-    WHERE assignment_id = $(assignment_id)
-    ORDER BY id DESC
+    SELECT s.canvas_object
+    FROM canvas_submissions s
+    JOIN canvas_assignments a ON a.id = s.assignment_id
+    JOIN canvas_courses c ON c.id = a.course_id
+    WHERE s.assignment_id = $(assignment_id)
+      AND c.canvas_user_id = $(canvas_user_id)
+    ORDER BY s.id DESC
     """
 
-    case DbHelpers.run_sql(sql, %{"assignment_id" => assignment_id}) do
+    case DbHelpers.run_sql(sql, %{
+           "assignment_id" => assignment_id,
+           "canvas_user_id" => canvas_user_id
+         }) do
       {:error, reason} -> {:error, reason}
       rows -> {:ok, parse_rows(rows)}
     end
   end
 
-  def list_ungraded_for_assignment(assignment_id) do
+  def list_ungraded_for_assignment(assignment_id, canvas_user_id) do
     sql = """
-    SELECT canvas_object
-    FROM canvas_submissions
-    WHERE assignment_id = $(assignment_id)
-      AND workflow_state = 'submitted'
-    ORDER BY id DESC
+    SELECT s.canvas_object
+    FROM canvas_submissions s
+    JOIN canvas_assignments a ON a.id = s.assignment_id
+    JOIN canvas_courses c ON c.id = a.course_id
+    WHERE s.assignment_id = $(assignment_id)
+      AND s.workflow_state = 'submitted'
+      AND c.canvas_user_id = $(canvas_user_id)
+    ORDER BY s.id DESC
     """
 
-    case DbHelpers.run_sql(sql, %{"assignment_id" => assignment_id}) do
+    case DbHelpers.run_sql(sql, %{
+           "assignment_id" => assignment_id,
+           "canvas_user_id" => canvas_user_id
+         }) do
       {:error, reason} -> {:error, reason}
       rows -> {:ok, parse_rows(rows)}
     end
   end
 
-  def get_by_id(submission_id) do
-    sql = "SELECT canvas_object FROM canvas_submissions WHERE id = $(id)"
+  def get_by_id(submission_id, canvas_user_id) do
+    sql = """
+    SELECT s.canvas_object
+    FROM canvas_submissions s
+    JOIN canvas_assignments a ON a.id = s.assignment_id
+    JOIN canvas_courses c ON c.id = a.course_id
+    WHERE s.id = $(id)
+      AND c.canvas_user_id = $(canvas_user_id)
+    """
 
-    case DbHelpers.run_sql(sql, %{"id" => submission_id}) do
+    case DbHelpers.run_sql(sql, %{"id" => submission_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
       [row | _] -> parse_canvas_object(row)
     end
   end
 
-  def get_for_student(assignment_id, user_id) do
+  def get_for_student(assignment_id, user_id, canvas_user_id) do
     sql = """
-    SELECT canvas_object
-    FROM canvas_submissions
-    WHERE assignment_id = $(assignment_id) AND user_id = $(user_id)
+    SELECT s.canvas_object
+    FROM canvas_submissions s
+    JOIN canvas_assignments a ON a.id = s.assignment_id
+    JOIN canvas_courses c ON c.id = a.course_id
+    WHERE s.assignment_id = $(assignment_id)
+      AND s.user_id = $(user_id)
+      AND c.canvas_user_id = $(canvas_user_id)
     """
 
-    case DbHelpers.run_sql(sql, %{"assignment_id" => assignment_id, "user_id" => user_id}) do
+    case DbHelpers.run_sql(sql, %{
+           "assignment_id" => assignment_id,
+           "user_id" => user_id,
+           "canvas_user_id" => canvas_user_id
+         }) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
       [row | _] -> parse_canvas_object(row)
     end
   end
 
-  def delete_for_assignment(assignment_id) do
-    sql = "DELETE FROM canvas_submissions WHERE assignment_id = $(assignment_id)"
+  def delete_for_assignment(assignment_id, canvas_user_id) do
+    sql = """
+    DELETE FROM canvas_submissions
+    WHERE assignment_id = $(assignment_id)
+      AND assignment_id IN (
+        SELECT a.id FROM canvas_assignments a
+        JOIN canvas_courses c ON c.id = a.course_id
+        WHERE c.canvas_user_id = $(canvas_user_id)
+      )
+    """
 
-    case DbHelpers.run_sql(sql, %{"assignment_id" => assignment_id}) do
+    case DbHelpers.run_sql(sql, %{
+           "assignment_id" => assignment_id,
+           "canvas_user_id" => canvas_user_id
+         }) do
       {:error, reason} -> {:error, reason}
       _ -> :ok
     end

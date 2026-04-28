@@ -14,7 +14,7 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
   end
 
   def handle({:get_canvas_courses, invalidate_cache}, %{canvas_token: token} = state) do
-    case Course.get_all_courses(token, invalidate_cache) do
+    case Course.get_all_courses(token, invalidate_cache, state.user.canvas_user_id) do
       {:ok, courses} ->
         Helpers.broadcast(state.user_id, {:canvas, :courses_refreshed, courses})
 
@@ -29,10 +29,38 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
     {:noreply, state}
   end
 
+  def handle({:get_course, course_id}, state) do
+    case Course.get_by_id(course_id, state.user.canvas_user_id) do
+      {:ok, course} ->
+        Helpers.broadcast(state.user_id, {:canvas, :course_loaded, course})
+
+      {:error, reason} ->
+        Logger.error(
+          "UserActor course fetch failed for course_id=#{course_id}: #{inspect(reason)}"
+        )
+    end
+
+    {:noreply, state}
+  end
+
+  def handle({:get_assignment, assignment_id}, state) do
+    case Assignment.get_by_id(assignment_id, state.user.canvas_user_id) do
+      {:ok, assignment} ->
+        Helpers.broadcast(state.user_id, {:canvas, :assignment_loaded, assignment})
+
+      {:error, reason} ->
+        Logger.error(
+          "UserActor assignment fetch failed for assignment_id=#{assignment_id}: #{inspect(reason)}"
+        )
+    end
+
+    {:noreply, state}
+  end
+
   def handle({:get_course_assignments, course_id}, state) do
     case Map.get(state.assignments, course_id) do
       nil ->
-        case Assignment.list_for_course(course_id) do
+        case Assignment.list_for_course(course_id, state.user.canvas_user_id) do
           {:ok, assignments} ->
             new_state = put_in(state.assignments[course_id], assignments)
 
@@ -107,7 +135,7 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
   def handle({:get_course_enrollments, course_id}, state) do
     case Map.get(state.enrollments, course_id) do
       nil ->
-        case Enrollment.list_for_course(course_id) do
+        case Enrollment.list_for_course(course_id, state.user.canvas_user_id) do
           {:ok, []} ->
             {:noreply, state}
 
@@ -166,7 +194,7 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
   def handle({:get_assignment_submissions, assignment_id}, state) do
     case Map.get(state.submissions, assignment_id) do
       nil ->
-        case Submission.list_for_assignment(assignment_id) do
+        case Submission.list_for_assignment(assignment_id, state.user.canvas_user_id) do
           {:ok, submissions} ->
             Helpers.broadcast(
               state.user_id,
@@ -213,7 +241,7 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
         {:get_rubric_for_assignment, course_id, assignment_id},
         %{canvas_token: token} = state
       ) do
-    case Rubric.get_for_assignment(assignment_id) do
+    case Rubric.get_for_assignment(assignment_id, state.user.canvas_user_id) do
       {:ok, rubric} ->
         Helpers.broadcast(state.user_id, {:canvas, :rubric_loaded, {assignment_id, rubric}})
 
@@ -287,7 +315,7 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
   end
 
   defp fetch_submission_from_db_or_api(state, assignment_id, course_id, token) do
-    case Submission.list_for_assignment(assignment_id) do
+    case Submission.list_for_assignment(assignment_id, state.user.canvas_user_id) do
       {:ok, []} ->
         fetch_submission_from_api(state, assignment_id, course_id, token)
 
@@ -336,7 +364,7 @@ defmodule CanvasMcp.UserActor.CanvasHandler do
   end
 
   defp load_submission_from_db(state, assignment_id) do
-    case Submission.list_for_assignment(assignment_id) do
+    case Submission.list_for_assignment(assignment_id, state.user.canvas_user_id) do
       {:ok, []} ->
         state
 

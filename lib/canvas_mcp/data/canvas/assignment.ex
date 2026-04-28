@@ -83,24 +83,32 @@ defmodule CanvasMcp.Canvas.Assignment do
     end)
   end
 
-  def list_for_course(course_id) do
+  def list_for_course(course_id, canvas_user_id) do
     sql = """
-    SELECT canvas_object
-    FROM canvas_assignments
-    WHERE course_id = $(course_id)
-    ORDER BY updated_at DESC
+    SELECT a.canvas_object
+    FROM canvas_assignments a
+    JOIN canvas_courses c ON c.id = a.course_id
+    WHERE a.course_id = $(course_id)
+      AND c.canvas_user_id = $(canvas_user_id)
+    ORDER BY a.updated_at DESC
     """
 
-    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       rows -> {:ok, parse_rows(rows)}
     end
   end
 
-  def get_by_id(assignment_id) do
-    sql = "SELECT canvas_object FROM canvas_assignments WHERE id = $(id)"
+  def get_by_id(assignment_id, canvas_user_id) do
+    sql = """
+    SELECT a.canvas_object
+    FROM canvas_assignments a
+    JOIN canvas_courses c ON c.id = a.course_id
+    WHERE a.id = $(id)
+      AND c.canvas_user_id = $(canvas_user_id)
+    """
 
-    case DbHelpers.run_sql(sql, %{"id" => assignment_id}) do
+    case DbHelpers.run_sql(sql, %{"id" => assignment_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
       [row | _] -> parse_canvas_object(row)
@@ -111,19 +119,31 @@ defmodule CanvasMcp.Canvas.Assignment do
   # DB — delete
   # ---------------------------------------------------------------------------
 
-  def delete_for_course(course_id) do
-    sql = "DELETE FROM canvas_assignments WHERE course_id = $(course_id)"
+  def delete_for_course(course_id, canvas_user_id) do
+    sql = """
+    DELETE FROM canvas_assignments
+    WHERE course_id = $(course_id)
+      AND course_id IN (
+        SELECT id FROM canvas_courses WHERE canvas_user_id = $(canvas_user_id)
+      )
+    """
 
-    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       _ -> :ok
     end
   end
 
-  def delete(assignment_id) do
-    sql = "DELETE FROM canvas_assignments WHERE id = $(id)"
+  def delete(assignment_id, canvas_user_id) do
+    sql = """
+    DELETE FROM canvas_assignments
+    WHERE id = $(id)
+      AND course_id IN (
+        SELECT id FROM canvas_courses WHERE canvas_user_id = $(canvas_user_id)
+      )
+    """
 
-    case DbHelpers.run_sql(sql, %{"id" => assignment_id}) do
+    case DbHelpers.run_sql(sql, %{"id" => assignment_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       _ -> :ok
     end

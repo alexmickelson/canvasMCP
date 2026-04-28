@@ -82,15 +82,17 @@ defmodule CanvasMcp.Canvas.Enrollment do
     end)
   end
 
-  def list_for_course(course_id) do
+  def list_for_course(course_id, canvas_user_id) do
     sql = """
-    SELECT canvas_object
-    FROM canvas_enrollments
-    WHERE course_id = $(course_id)
-    ORDER BY updated_at DESC
+    SELECT e.canvas_object
+    FROM canvas_enrollments e
+    JOIN canvas_courses c ON c.id = e.course_id
+    WHERE e.course_id = $(course_id)
+      AND c.canvas_user_id = $(canvas_user_id)
+    ORDER BY e.updated_at DESC
     """
 
-    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       rows -> {:ok, parse_rows(rows)}
     end
@@ -120,25 +122,33 @@ defmodule CanvasMcp.Canvas.Enrollment do
     end
   end
 
-  def active_student_ids_for_course(course_id) do
+  def active_student_ids_for_course(course_id, canvas_user_id) do
     sql = """
-    SELECT user_id
-    FROM canvas_enrollments
-    WHERE course_id = $(course_id)
-      AND enrollment_state = 'active'
-      AND canvas_object->>'type' = 'StudentEnrollment'
+    SELECT e.user_id
+    FROM canvas_enrollments e
+    JOIN canvas_courses c ON c.id = e.course_id
+    WHERE e.course_id = $(course_id)
+      AND e.enrollment_state = 'active'
+      AND e.canvas_object->>'type' = 'StudentEnrollment'
+      AND c.canvas_user_id = $(canvas_user_id)
     """
 
-    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       rows -> {:ok, MapSet.new(rows, fn %{"user_id" => id} -> id end)}
     end
   end
 
-  def delete_for_course(course_id) do
-    sql = "DELETE FROM canvas_enrollments WHERE course_id = $(course_id)"
+  def delete_for_course(course_id, canvas_user_id) do
+    sql = """
+    DELETE FROM canvas_enrollments
+    WHERE course_id = $(course_id)
+      AND course_id IN (
+        SELECT id FROM canvas_courses WHERE canvas_user_id = $(canvas_user_id)
+      )
+    """
 
-    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       _ -> :ok
     end

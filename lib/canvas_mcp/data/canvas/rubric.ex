@@ -124,48 +124,68 @@ defmodule CanvasMcp.Canvas.Rubric do
     end)
   end
 
-  def list_for_course(course_id) do
+  def list_for_course(course_id, canvas_user_id) do
     sql = """
-    SELECT canvas_object
-    FROM canvas_rubrics
-    WHERE course_id = $(course_id)
-    ORDER BY updated_at DESC
+    SELECT r.canvas_object
+    FROM canvas_rubrics r
+    JOIN canvas_courses c ON c.id = r.course_id
+    WHERE r.course_id = $(course_id)
+      AND c.canvas_user_id = $(canvas_user_id)
+    ORDER BY r.updated_at DESC
     """
 
-    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       rows -> {:ok, parse_rows(rows)}
     end
   end
 
-  def get_for_assignment(assignment_id) do
+  def get_for_assignment(assignment_id, canvas_user_id) do
     sql = """
-    SELECT canvas_object
-    FROM canvas_rubrics
-    WHERE assignment_id = $(assignment_id)
+    SELECT r.canvas_object
+    FROM canvas_rubrics r
+    JOIN canvas_assignments a ON a.id = r.assignment_id
+    JOIN canvas_courses c ON c.id = a.course_id
+    WHERE r.assignment_id = $(assignment_id)
+      AND c.canvas_user_id = $(canvas_user_id)
     """
 
-    case DbHelpers.run_sql(sql, %{"assignment_id" => assignment_id}) do
+    case DbHelpers.run_sql(sql, %{
+           "assignment_id" => assignment_id,
+           "canvas_user_id" => canvas_user_id
+         }) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
       [row | _] -> parse_canvas_object(row)
     end
   end
 
-  def get_by_id(rubric_id) do
-    sql = "SELECT canvas_object FROM canvas_rubrics WHERE id = $(id)"
+  def get_by_id(rubric_id, canvas_user_id) do
+    sql = """
+    SELECT r.canvas_object
+    FROM canvas_rubrics r
+    JOIN canvas_courses c ON c.id = r.course_id
+    WHERE r.id = $(id)
+      AND c.canvas_user_id = $(canvas_user_id)
+    """
 
-    case DbHelpers.run_sql(sql, %{"id" => rubric_id}) do
+    case DbHelpers.run_sql(sql, %{"id" => rubric_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
       [row | _] -> parse_canvas_object(row)
     end
   end
 
-  def delete_for_course(course_id) do
-    sql = "DELETE FROM canvas_rubrics WHERE course_id = $(course_id)"
+  def delete_for_course(course_id, canvas_user_id) do
+    sql = """
+    DELETE FROM canvas_rubrics
+    WHERE course_id = $(course_id)
+      AND course_id IN (
+        SELECT id FROM canvas_courses WHERE canvas_user_id = $(canvas_user_id)
+      )
+    """
 
-    case DbHelpers.run_sql(sql, %{"course_id" => course_id}) do
+    case DbHelpers.run_sql(sql, %{"course_id" => course_id, "canvas_user_id" => canvas_user_id}) do
       {:error, reason} -> {:error, reason}
       _ -> :ok
     end

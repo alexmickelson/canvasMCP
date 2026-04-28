@@ -27,6 +27,14 @@ defmodule CanvasMcp.UserActor do
     GenServer.cast(via(user_id), {:canvas, {:get_canvas_courses, invalidate_cache}})
   end
 
+  def get_course(user_id, course_id) do
+    GenServer.cast(via(user_id), {:canvas, {:get_course, course_id}})
+  end
+
+  def get_assignment(user_id, assignment_id) do
+    GenServer.cast(via(user_id), {:canvas, {:get_assignment, assignment_id}})
+  end
+
   def get_course_assignments(user_id, course_id) do
     GenServer.cast(via(user_id), {:canvas, {:get_course_assignments, course_id}})
   end

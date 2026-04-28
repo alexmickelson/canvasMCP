@@ -9,9 +9,6 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Migration: add canvas_user_id to existing databases
--- ALTER TABLE users ADD COLUMN IF NOT EXISTS canvas_user_id BIGINT;
-
 CREATE TABLE IF NOT EXISTS admins (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -31,13 +28,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 
 CREATE TABLE IF NOT EXISTS canvas_courses (
-  id             BIGINT      PRIMARY KEY,
-  term_id        BIGINT,
-  term_name      TEXT,
-  canvas_object  JSONB       NOT NULL,
-  fetched_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id               BIGINT      PRIMARY KEY,
+  canvas_user_id   BIGINT,
+  term_id          BIGINT,
+  term_name        TEXT,
+  canvas_object    JSONB       NOT NULL,
+  fetched_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+
+CREATE INDEX IF NOT EXISTS canvas_courses_canvas_user_id_idx ON canvas_courses(canvas_user_id);
 
 CREATE TABLE IF NOT EXISTS canvas_enrollments (
   id               BIGINT      PRIMARY KEY,
@@ -97,3 +98,20 @@ CREATE TABLE IF NOT EXISTS canvas_users (
 );
 
 CREATE INDEX IF NOT EXISTS canvas_users_login_id_idx ON canvas_users(login_id);
+
+CREATE TABLE IF NOT EXISTS service_accounts (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name         TEXT        NOT NULL,
+  token_hash   TEXT        NOT NULL UNIQUE,
+  token_prefix TEXT        NOT NULL,
+  inserted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS service_accounts_user_id_idx ON service_accounts(user_id);
+
+CREATE TABLE IF NOT EXISTS service_account_courses (
+  service_account_id  UUID    NOT NULL REFERENCES service_accounts(id) ON DELETE CASCADE,
+  course_id           BIGINT  NOT NULL REFERENCES canvas_courses(id) ON DELETE CASCADE,
+  PRIMARY KEY (service_account_id, course_id)
+);

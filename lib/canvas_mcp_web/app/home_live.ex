@@ -3,6 +3,8 @@ defmodule CanvasMcpWeb.App.HomeLive do
   require Logger
   alias CanvasMcp.UserActor
   alias CanvasMcp.Data.User
+  alias CanvasMcp.Data.ServiceAccount
+  import CanvasMcpWeb.App.ServiceAccounts.ServiceAccountsPanel
 
   @impl true
   def mount(_params, _session, socket) do
@@ -21,6 +23,12 @@ defmodule CanvasMcpWeb.App.HomeLive do
       |> assign(:courses, [])
       |> assign(:courses_status, nil)
       |> assign(:selected_term, nil)
+      |> assign(:sa_name_form, to_form(%{"name" => ""}))
+      |> assign(:sa_new_token, nil)
+      |> assign(:sa_revoke_confirm, nil)
+      |> assign(:sa_form_key, 0)
+      |> stream_configure(:service_accounts, dom_id: &"service-account-#{&1["id"]}")
+      |> stream(:service_accounts, service_accounts(current_user.id))
 
     {:ok, socket}
   end
@@ -79,10 +87,73 @@ defmodule CanvasMcpWeb.App.HomeLive do
   end
 
   @impl true
+  def handle_event("sa_create", %{"name" => name}, socket) do
+    name = String.trim(name)
+
+    if name == "" do
+      {:noreply,
+       assign(
+         socket,
+         :sa_name_form,
+         to_form(%{"name" => ""}, errors: [name: {"can't be blank", []}])
+       )}
+    else
+      case ServiceAccount.create(socket.assigns.current_user.id, name) do
+        {:ok, account, raw_token} ->
+          {:noreply,
+           socket
+           |> stream_insert(:service_accounts, account, at: 0)
+           |> assign(:sa_name_form, to_form(%{"name" => ""}))
+           |> assign(:sa_form_key, socket.assigns.sa_form_key + 1)
+           |> assign(:sa_new_token, %{name: account["name"], token: raw_token})}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to create service account.")}
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("sa_dismiss_token", _params, socket) do
+    {:noreply, assign(socket, :sa_new_token, nil)}
+  end
+
+  @impl true
+  def handle_event("sa_revoke_confirm", %{"id" => id, "name" => name}, socket) do
+    {:noreply, assign(socket, :sa_revoke_confirm, %{"id" => id, "name" => name})}
+  end
+
+  @impl true
+  def handle_event("sa_revoke_cancel", _params, socket) do
+    {:noreply, assign(socket, :sa_revoke_confirm, nil)}
+  end
+
+  @impl true
+  def handle_event("sa_revoke", %{"id" => id}, socket) do
+    case ServiceAccount.revoke(id, socket.assigns.current_user.id) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(:sa_revoke_confirm, nil)
+         |> stream_delete_by_dom_id(:service_accounts, "service-account-#{id}")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to revoke service account.")}
+    end
+  end
+
+  defp service_accounts(user_id) do
+    case ServiceAccount.list_for_user(user_id) do
+      {:ok, list} -> list
+      _ -> []
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user} notifications={@notifications}>
-      <div class="px-6 py-8 space-y-6">
+      <div class="px-6 py-8 space-y-10">
         <%= if not @has_canvas_token do %>
           <div class="rounded-xl border border-amber-700/40 bg-amber-950/20 px-5 py-4 flex items-start gap-3">
             <svg
@@ -114,6 +185,16 @@ defmodule CanvasMcpWeb.App.HomeLive do
         <% else %>
           <.all_courses courses={@courses} status={@courses_status} selected_term={@selected_term} />
         <% end %>
+
+        <div class="border-t border-slate-800 pt-8">
+          <.service_accounts_panel
+            name_form={@sa_name_form}
+            new_token={@sa_new_token}
+            accounts_stream={@streams.service_accounts}
+            revoke_confirm={@sa_revoke_confirm}
+            form_key={@sa_form_key}
+          />
+        </div>
       </div>
     </Layouts.app>
     """

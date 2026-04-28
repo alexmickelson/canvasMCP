@@ -1,7 +1,6 @@
 defmodule CanvasMcpWeb.App.Courses.CourseLive do
   use CanvasMcpWeb, :live_view
   alias CanvasMcp.UserActor
-  alias CanvasMcp.Canvas.Course
   alias CanvasMcpWeb.Layouts
   import CanvasMcpWeb.App.Courses.CourseCalendar
 
@@ -14,22 +13,17 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
 
     if connected?(socket) do
       UserActor.subscribe_to_user(current_user.id)
+      UserActor.get_course(current_user.id, course_id)
       UserActor.get_course_assignments(current_user.id, course_id)
       UserActor.get_course_enrollments(current_user.id, course_id)
     end
-
-    course =
-      case Course.get_by_id(course_id) do
-        {:ok, c} -> c
-        _ -> nil
-      end
 
     canvas_base_url = System.get_env("CANVAS_BASE_URL", "https://snow.instructure.com")
 
     socket =
       socket
       |> assign(:course_id, course_id)
-      |> assign(:course, course)
+      |> assign(:course, nil)
       |> assign(:canvas_course_url, "#{canvas_base_url}/courses/#{course_id}")
       |> assign(:assignments_status, nil)
       |> assign(:assignments_list, [])
@@ -43,6 +37,11 @@ defmodule CanvasMcpWeb.App.Courses.CourseLive do
   @impl true
   def handle_params(_params, _uri, socket) do
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:canvas, :course_loaded, course}, socket) do
+    {:noreply, assign(socket, :course, course)}
   end
 
   @impl true

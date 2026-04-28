@@ -38,6 +38,7 @@ defmodule CanvasMcpWeb.Router do
       ] do
       live "/app", HomeLive
       live "/app/profile", ProfileLive
+      live "/app/service-accounts/:id", ServiceAccounts.ServiceAccountLive
       live "/app/courses/:course_id", Courses.CourseLive
       live "/app/courses/:course_id/assignments/:id", Courses.AssignmentLive
     end
