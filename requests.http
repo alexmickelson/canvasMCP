@@ -1,0 +1,21 @@
+# CanvasMCP API — example requests
+# Add API_TOKEN=<your_token> to your .env file, then use "Send Request" in VS Code.
+
+@baseUrl = http://localhost:4000
+@token = {{$dotenv API_TOKEN}}
+
+###
+# OpenAPI spec (no auth required)
+GET {{baseUrl}}/api/openapi.json
+Accept: application/json
+
+###
+# List all courses assigned to this service account token
+GET {{baseUrl}}/api/v1/courses
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+GET {{baseUrl}}/api/v1/courses/1246762
+Authorization: Bearer {{token}}
+Accept: application/json

@@ -14,6 +14,11 @@ defmodule CanvasMcpWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :api_authenticated do
+    plug :accepts, ["json"]
+    plug CanvasMcpWeb.Api.Plugs.ServiceAccountAuth
+  end
+
   pipeline :require_admin do
     plug :require_admin_user
   end
@@ -62,9 +67,20 @@ defmodule CanvasMcpWeb.Router do
   end
 
   # Other scopes may use custom stacks.
-  # scope "/api", CanvasMcpWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", CanvasMcpWeb.Api do
+    pipe_through :api
+
+    get "/openapi.json", OpenApiController, :spec
+  end
+
+  scope "/api/v1", CanvasMcpWeb.Api do
+    pipe_through :api_authenticated
+
+    scope "/courses", Courses do
+      get "/", CoursesController, :index
+      get "/:id", CoursesController, :show
+    end
+  end
 
   if Application.compile_env(:canvas_mcp, :dev_routes) do
     import Phoenix.LiveDashboard.Router

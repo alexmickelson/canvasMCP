@@ -120,7 +120,9 @@ defmodule CanvasMcpWeb.App.ServiceAccounts.ServiceAccountLive do
 
           <%= if @courses == [] do %>
             <div class="rounded-xl border border-slate-700 border-dashed px-5 py-8 text-center">
-              <p class="text-sm text-slate-500">No courses found. Sync your Canvas courses from the home page first.</p>
+              <p class="text-sm text-slate-500">
+                No courses found. Sync your Canvas courses from the home page first.
+              </p>
             </div>
           <% else %>
             <%!-- Group by term --%>
@@ -175,6 +177,14 @@ defmodule CanvasMcpWeb.App.ServiceAccounts.ServiceAccountLive do
   defp group_by_term(courses) do
     courses
     |> Enum.group_by(&(&1["term_name"] || "No Term"))
-    |> Enum.sort_by(fn {term, _} -> term end, :desc)
+    |> Enum.sort_by(
+      fn {term, [first | _]} ->
+        default? = String.downcase(term) == "default term"
+        end_at = first["term_end_at"] || ""
+        # non-default gets priority 1 (sorts first desc), default gets 0 (sorts last)
+        {if(default?, do: 0, else: 1), end_at}
+      end,
+      :desc
+    )
   end
 end

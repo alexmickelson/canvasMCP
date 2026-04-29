@@ -72,6 +72,7 @@ defmodule CanvasMcp.Data.ServiceAccount do
       cc.canvas_object->>'name'              AS name,
       cc.canvas_object->>'course_code'       AS course_code,
       cc.canvas_object->'term'->>'name'      AS term_name,
+      cc.canvas_object->'term'->>'end_at'    AS term_end_at,
       cc.canvas_object->>'workflow_state'    AS workflow_state,
       (sac.service_account_id IS NOT NULL)   AS assigned
     FROM canvas_courses cc
@@ -79,7 +80,7 @@ defmodule CanvasMcp.Data.ServiceAccount do
       ON sac.course_id = cc.id
       AND sac.service_account_id = $(service_account_id)
     WHERE cc.canvas_user_id = $(canvas_user_id)
-    ORDER BY cc.updated_at DESC
+    ORDER BY cc.canvas_object->'term'->>'end_at' DESC NULLS LAST, cc.id
     """
 
     case DbHelpers.run_sql(sql, %{
@@ -104,7 +105,7 @@ defmodule CanvasMcp.Data.ServiceAccount do
 
     case DbHelpers.run_sql(sql, %{
            "service_account_id" => service_account_id,
-           "course_id" => course_id,
+           "course_id" => to_integer(course_id),
            "user_id" => user_id
          }) do
       {:error, reason} -> {:error, reason}
@@ -125,7 +126,7 @@ defmodule CanvasMcp.Data.ServiceAccount do
 
     case DbHelpers.run_sql(sql, %{
            "service_account_id" => service_account_id,
-           "course_id" => course_id,
+           "course_id" => to_integer(course_id),
            "user_id" => user_id
          }) do
       {:error, reason} -> {:error, reason}
@@ -137,7 +138,7 @@ defmodule CanvasMcp.Data.ServiceAccount do
     token_hash = hash_token(raw_token)
 
     sql = """
-    SELECT sa.user_id
+    SELECT sa.id, sa.user_id, sa.name
     FROM service_accounts sa
     WHERE sa.token_hash = $(token_hash)
     """
@@ -148,6 +149,49 @@ defmodule CanvasMcp.Data.ServiceAccount do
       [row | _] -> {:ok, row}
     end
   end
+
+  @doc """
+  Returns all courses assigned to this service account with their full canvas_object.
+  """
+  def list_assigned_courses(service_account_id) do
+    sql = """
+    SELECT cc.canvas_object
+    FROM canvas_courses cc
+    INNER JOIN service_account_courses sac ON sac.course_id = cc.id
+    WHERE sac.service_account_id = $(service_account_id)
+    ORDER BY cc.canvas_object->'term'->>'end_at' DESC NULLS LAST, cc.id
+    """
+
+    case DbHelpers.run_sql(sql, %{"service_account_id" => service_account_id}) do
+      {:error, reason} -> {:error, reason}
+      rows -> {:ok, Enum.map(rows, & &1["canvas_object"])}
+    end
+  end
+
+  @doc """
+  Returns a single course's canvas_object only if it is assigned to the service account.
+  """
+  def get_assigned_course(service_account_id, course_id) do
+    sql = """
+    SELECT cc.canvas_object
+    FROM canvas_courses cc
+    INNER JOIN service_account_courses sac ON sac.course_id = cc.id
+    WHERE sac.service_account_id = $(service_account_id)
+      AND cc.id = $(course_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{
+           "service_account_id" => service_account_id,
+           "course_id" => to_integer(course_id)
+         }) do
+      {:error, reason} -> {:error, reason}
+      [] -> {:error, :not_found}
+      [row | _] -> {:ok, row["canvas_object"]}
+    end
+  end
+
+  defp to_integer(v) when is_integer(v), do: v
+  defp to_integer(v) when is_binary(v), do: String.to_integer(v)
 
   defp generate_token do
     :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower)
