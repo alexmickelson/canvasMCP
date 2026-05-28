@@ -64,6 +64,7 @@ defmodule CanvasMcpWeb.Router do
     get "/login", AuthController, :authorize
     get "/callback", AuthController, :callback
     get "/logout", AuthController, :logout
+    get "/refresh", AuthController, :refresh
   end
 
   # Other scopes may use custom stacks.

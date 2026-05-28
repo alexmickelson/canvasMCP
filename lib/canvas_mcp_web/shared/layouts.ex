@@ -68,6 +68,21 @@ defmodule CanvasMcpWeb.Layouts do
       <% end %>
     </div>
     <.flash_group flash={@flash} />
+    <div id="session-refresh-hook" phx-hook=".SessionRefresh" phx-update="ignore" class="hidden">
+    </div>
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".SessionRefresh">
+      export default {
+        mounted() {
+          this.handleEvent("session_refresh", () => {
+            fetch("/auth/refresh", { credentials: "same-origin" })
+              .catch(() => { window.location.href = "/auth/login"; })
+              .then(resp => {
+                if (resp && !resp.ok) { window.location.href = "/auth/login"; }
+              });
+          });
+        }
+      }
+    </script>
     """
   end
 

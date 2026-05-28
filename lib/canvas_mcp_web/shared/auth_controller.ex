@@ -44,11 +44,12 @@ defmodule CanvasMcpWeb.AuthController do
 
   def callback(
         %Plug.Conn{
-          private: %{Oidcc.Plug.AuthorizationCallback => {:ok, {_token, userinfo}}}
+          private: %{Oidcc.Plug.AuthorizationCallback => {:ok, {token, userinfo}}}
         } = conn,
         _params
       ) do
     email = Map.get(userinfo, "email")
+    token_exp = Map.get(token.id.claims, "exp")
 
     Logger.info(
       "User login successful sub=#{Map.get(userinfo, "sub")} email=#{email} remote_ip=#{format_ip(conn.remote_ip)}"
@@ -61,12 +62,21 @@ defmodule CanvasMcpWeb.AuthController do
           email: email
         })
 
+        refresh_token =
+          case token.refresh do
+            %Oidcc.Token.Refresh{token: rt} -> rt
+            _ -> nil
+          end
+
         return_to = get_session(conn, "return_to") || "/"
 
         conn
+        |> configure_session(renew: true)
         |> delete_session("return_to")
         |> put_session("oidc_claims", userinfo)
         |> put_session("current_user_id", user_profile.id)
+        |> put_session("session_expires_at", token_exp)
+        |> put_session("refresh_token", refresh_token)
         |> redirect(to: return_to)
 
       {:error, reason} ->
@@ -118,6 +128,39 @@ defmodule CanvasMcpWeb.AuthController do
     conn
     |> clear_session()
     |> redirect(to: ~p"/")
+  end
+
+  def refresh(conn, _params) do
+    refresh_token = get_session(conn, "refresh_token")
+    claims = get_session(conn, "oidc_claims")
+    sub = claims && Map.get(claims, "sub")
+
+    with true <- is_binary(refresh_token) and is_binary(sub),
+         {:ok, client_context} <-
+           Oidcc.ClientContext.from_configuration_worker(
+             CanvasMcp.OidcProvider,
+             client_id(),
+             :unauthenticated
+           ),
+         {:ok, new_token} <-
+           Oidcc.Token.refresh(refresh_token, client_context, %{expected_subject: sub}) do
+      new_exp = Map.get(new_token.id.claims, "exp")
+
+      new_refresh =
+        case new_token.refresh do
+          %Oidcc.Token.Refresh{token: rt} -> rt
+          _ -> refresh_token
+        end
+
+      conn
+      |> put_session("session_expires_at", new_exp)
+      |> put_session("refresh_token", new_refresh)
+      |> send_resp(204, "")
+    else
+      _ ->
+        conn
+        |> send_resp(401, "")
+    end
   end
 
   defp save_return_to(conn, _opts) do
