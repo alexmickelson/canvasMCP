@@ -19,3 +19,27 @@ Accept: application/json
 GET {{baseUrl}}/api/v1/courses/1246762
 Authorization: Bearer {{token}}
 Accept: application/json
+
+###
+# List assignments for a course
+GET {{baseUrl}}/api/v1/courses/1246762/assignments
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+# Get single assignment
+GET {{baseUrl}}/api/v1/courses/1246762/assignments/987654
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+# List submissions for an assignment
+GET {{baseUrl}}/api/v1/courses/1246762/assignments/987654/submissions
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+# Get single submission (submission ID = Canvas user/student ID)
+GET {{baseUrl}}/api/v1/courses/1246762/assignments/987654/submissions/111222
+Authorization: Bearer {{token}}
+Accept: application/json

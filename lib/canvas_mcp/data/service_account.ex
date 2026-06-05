@@ -150,9 +150,6 @@ defmodule CanvasMcp.Data.ServiceAccount do
     end
   end
 
-  @doc """
-  Returns all courses assigned to this service account with their full canvas_object.
-  """
   def list_assigned_courses(service_account_id) do
     sql = """
     SELECT cc.canvas_object
@@ -168,9 +165,6 @@ defmodule CanvasMcp.Data.ServiceAccount do
     end
   end
 
-  @doc """
-  Returns a single course's canvas_object only if it is assigned to the service account.
-  """
   def get_assigned_course(service_account_id, course_id) do
     sql = """
     SELECT cc.canvas_object
@@ -183,6 +177,106 @@ defmodule CanvasMcp.Data.ServiceAccount do
     case DbHelpers.run_sql(sql, %{
            "service_account_id" => service_account_id,
            "course_id" => to_integer(course_id)
+         }) do
+      {:error, reason} -> {:error, reason}
+      [] -> {:error, :not_found}
+      [row | _] -> {:ok, row["canvas_object"]}
+    end
+  end
+
+  @doc """
+  Returns all assignments for a course assigned to this service account.
+  """
+  def list_course_assignments(service_account_id, course_id) do
+    sql = """
+    SELECT ca.canvas_object
+    FROM canvas_assignments ca
+    INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
+    WHERE sac.service_account_id = $(service_account_id)
+      AND ca.course_id = $(course_id)
+    ORDER BY ca.id
+    """
+
+    case DbHelpers.run_sql(sql, %{
+           "service_account_id" => service_account_id,
+           "course_id" => to_integer(course_id)
+         }) do
+      {:error, reason} -> {:error, reason}
+      [] -> {:error, :not_found}
+      rows -> {:ok, Enum.map(rows, & &1["canvas_object"])}
+    end
+  end
+
+  @doc """
+  Returns a single assignment's canvas_object if the parent course is assigned.
+  """
+  def get_assignment(service_account_id, course_id, assignment_id) do
+    sql = """
+    SELECT ca.canvas_object
+    FROM canvas_assignments ca
+    INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
+    WHERE sac.service_account_id = $(service_account_id)
+      AND ca.course_id = $(course_id)
+      AND ca.id = $(assignment_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{
+           "service_account_id" => service_account_id,
+           "course_id" => to_integer(course_id),
+           "assignment_id" => to_integer(assignment_id)
+         }) do
+      {:error, reason} -> {:error, reason}
+      [] -> {:error, :not_found}
+      [row | _] -> {:ok, row["canvas_object"]}
+    end
+  end
+
+  @doc """
+  Returns all submissions for an assignment in a course assigned to this service account.
+  """
+  def list_assignment_submissions(service_account_id, course_id, assignment_id) do
+    sql = """
+    SELECT cs.canvas_object
+    FROM canvas_submissions cs
+    INNER JOIN canvas_assignments ca ON ca.id = cs.assignment_id
+    INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
+    WHERE sac.service_account_id = $(service_account_id)
+      AND ca.course_id = $(course_id)
+      AND cs.assignment_id = $(assignment_id)
+    ORDER BY cs.id
+    """
+
+    case DbHelpers.run_sql(sql, %{
+           "service_account_id" => service_account_id,
+           "course_id" => to_integer(course_id),
+           "assignment_id" => to_integer(assignment_id)
+         }) do
+      {:error, reason} -> {:error, reason}
+      [] -> {:error, :not_found}
+      rows -> {:ok, Enum.map(rows, & &1["canvas_object"])}
+    end
+  end
+
+  @doc """
+  Returns a single submission's canvas_object if the parent course is assigned.
+  """
+  def get_submission(service_account_id, course_id, assignment_id, submission_id) do
+    sql = """
+    SELECT cs.canvas_object
+    FROM canvas_submissions cs
+    INNER JOIN canvas_assignments ca ON ca.id = cs.assignment_id
+    INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
+    WHERE sac.service_account_id = $(service_account_id)
+      AND ca.course_id = $(course_id)
+      AND cs.assignment_id = $(assignment_id)
+      AND cs.user_id = $(submission_id)
+    """
+
+    case DbHelpers.run_sql(sql, %{
+           "service_account_id" => service_account_id,
+           "course_id" => to_integer(course_id),
+           "assignment_id" => to_integer(assignment_id),
+           "submission_id" => to_integer(submission_id)
          }) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}

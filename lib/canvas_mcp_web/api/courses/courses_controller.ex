@@ -2,11 +2,6 @@ defmodule CanvasMcpWeb.Api.Courses.CoursesController do
   use CanvasMcpWeb, :controller
   alias CanvasMcp.Data.ServiceAccount
 
-  # ---------------------------------------------------------------------------
-  # OpenAPI metadata — consumed by CanvasMcpWeb.Api.OpenApi to build the spec.
-  # Keep schemas and operations here so they stay in sync with the implementation.
-  # ---------------------------------------------------------------------------
-
   def openapi_schemas do
     %{
       "CourseTerm" => %{
@@ -104,10 +99,6 @@ defmodule CanvasMcpWeb.Api.Courses.CoursesController do
       }
     }
   end
-
-  # ---------------------------------------------------------------------------
-  # Actions
-  # ---------------------------------------------------------------------------
 
   @doc "GET /api/v1/courses — list all courses assigned to this service account"
   def index(conn, _params) do

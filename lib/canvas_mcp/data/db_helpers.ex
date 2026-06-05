@@ -2,19 +2,10 @@ defmodule CanvasMcp.Data.DbHelpers do
   require Logger
   @get_named_param ~r/\$\((\w+)\)/
 
-  @doc """
-  Runs SQL with named parameters (e.g. `$(name)`) and validates each row
-  against the given Zoi schema, returning `{:error, :db_error}` or a list of
-  validated structs/maps.
-  """
   def run_sql(sql, params, schema) when not is_nil(schema) do
     run_sql(sql, params) |> validate_rows(schema)
   end
 
-  @doc """
-  Runs SQL with named parameters (e.g. `$(name)`) and returns a list of row
-  maps with string keys, or `{:error, :db_error}`.
-  """
   def run_sql(sql, params) do
     original_sql = sql
     original_params = params
@@ -37,11 +28,6 @@ defmodule CanvasMcp.Data.DbHelpers do
     end
   end
 
-  @doc """
-  Converts `$(param_name)` placeholders to positional `$1`, `$2`, … params
-  expected by Postgrex. Repeated occurrences of the same name reuse the same
-  positional index.
-  """
   def named_params_to_positional_params(query, params) do
     param_occurrences = Regex.scan(@get_named_param, query)
 

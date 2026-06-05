@@ -13,10 +13,14 @@ defmodule CanvasMcpWeb.Api.OpenApi do
   """
 
   alias CanvasMcpWeb.Api.Courses.CoursesController
+  alias CanvasMcpWeb.Api.Assignments.AssignmentsController
+  alias CanvasMcpWeb.Api.Submissions.SubmissionsController
 
   # Register every controller that contributes to the spec here.
   @controllers [
-    CoursesController
+    CoursesController,
+    AssignmentsController,
+    SubmissionsController
   ]
 
   # Shared response components referenced by operations via "$ref".

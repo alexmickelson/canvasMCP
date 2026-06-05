@@ -81,6 +81,22 @@ defmodule CanvasMcpWeb.Router do
       get "/", CoursesController, :index
       get "/:id", CoursesController, :show
     end
+
+    get "/courses/:course_id/assignments",
+        Assignments.AssignmentsController,
+        :index
+
+    get "/courses/:course_id/assignments/:id",
+        Assignments.AssignmentsController,
+        :show
+
+    get "/courses/:course_id/assignments/:assignment_id/submissions",
+        Submissions.SubmissionsController,
+        :index
+
+    get "/courses/:course_id/assignments/:assignment_id/submissions/:id",
+        Submissions.SubmissionsController,
+        :show
   end
 
   if Application.compile_env(:canvas_mcp, :dev_routes) do
