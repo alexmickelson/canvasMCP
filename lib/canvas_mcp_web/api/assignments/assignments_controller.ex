@@ -2,12 +2,20 @@ defmodule CanvasMcpWeb.Api.Assignments.AssignmentsController do
   use CanvasMcpWeb, :controller
   alias CanvasMcp.Data.ServiceAccount
 
-  # ---------------------------------------------------------------------------
-  # OpenAPI metadata — consumed by CanvasMcpWeb.Api.OpenApi to build the spec.
-  # ---------------------------------------------------------------------------
-
   def openapi_schemas do
     %{
+      "AssignmentListItem" => %{
+        type: "object",
+        properties: %{
+          id: %{type: "integer", example: 987_654},
+          name: %{type: "string", example: "Homework 1"},
+          due_at: %{type: "string", format: "date-time", nullable: true},
+          due_at_formatted: %{type: "string", nullable: true, example: "2 days ago"},
+          submission_count: %{type: "integer", example: 4},
+          total_students: %{type: "integer", example: 16},
+          submissions_of_total: %{type: "string", example: "4 / 16"}
+        }
+      },
       "Assignment" => %{
         type: "object",
         properties: %{
@@ -41,7 +49,7 @@ defmodule CanvasMcpWeb.Api.Assignments.AssignmentsController do
         type: "object",
         required: ["data"],
         properties: %{
-          data: %{type: "array", items: %{"$ref" => "#/components/schemas/Assignment"}}
+          data: %{type: "array", items: %{"$ref" => "#/components/schemas/AssignmentListItem"}}
         }
       },
       "AssignmentResponse" => %{
@@ -130,7 +138,8 @@ defmodule CanvasMcpWeb.Api.Assignments.AssignmentsController do
   def index(conn, %{"course_id" => course_id}) do
     case ServiceAccount.list_course_assignments(conn.assigns.service_account_id, course_id) do
       {:ok, assignments} ->
-        json(conn, %{data: assignments})
+        formatted = Enum.map(assignments, &format_assignment/1)
+        json(conn, %{data: formatted})
 
       {:error, :not_found} ->
         conn
@@ -166,6 +175,55 @@ defmodule CanvasMcpWeb.Api.Assignments.AssignmentsController do
         conn
         |> put_status(500)
         |> json(%{error: "internal_error", message: "Failed to fetch assignment"})
+    end
+  end
+
+  defp format_assignment(row) do
+    due_at = row["due_at"]
+    submitted = row["submission_count"]
+    total = row["total_students"]
+
+    %{
+      id: row["id"],
+      name: row["name"],
+      due_at: due_at,
+      due_at_formatted: if(due_at, do: time_ago_from_iso(due_at), else: nil),
+      submission_count: submitted,
+      total_students: total,
+      submissions_of_total: "#{submitted} / #{total}"
+    }
+  end
+
+  defp time_ago_from_iso(iso_string) do
+    case DateTime.from_iso8601(iso_string) do
+      {:ok, dt, _offset} -> time_ago(dt)
+      _ -> nil
+    end
+  end
+
+  defp time_ago(dt) do
+    now = DateTime.utc_now()
+    diff_seconds = DateTime.diff(now, dt)
+    diff_minutes = div(diff_seconds, 60)
+
+    cond do
+      diff_minutes < 0 -> "in #{format_duration(-diff_minutes)}"
+      diff_minutes == 0 -> "just now"
+      diff_minutes == 1 -> "1 minute ago"
+      diff_minutes < 60 -> "#{diff_minutes} minutes ago"
+      diff_minutes < 120 -> "1 hour ago"
+      diff_minutes < 1_440 -> "#{div(diff_minutes, 60)} hours ago"
+      diff_minutes < 2_880 -> "1 day ago"
+      true -> "#{div(diff_minutes, 1_440)} days ago"
+    end
+  end
+
+  defp format_duration(minutes) do
+    cond do
+      minutes < 60 -> "#{minutes} minutes"
+      minutes < 1_440 -> "#{div(minutes, 60)} hours"
+      minutes < 2_880 -> "1 day"
+      true -> "#{div(minutes, 1_440)} days"
     end
   end
 end

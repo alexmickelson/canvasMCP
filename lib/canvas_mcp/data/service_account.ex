@@ -185,16 +185,32 @@ defmodule CanvasMcp.Data.ServiceAccount do
   end
 
   @doc """
-  Returns all assignments for a course assigned to this service account.
+  Returns assignments for a course with extracted fields and submission count.
+  Each row contains: id, name, due_at (ISO string or nil), submission_count,
+  total_students.
   """
   def list_course_assignments(service_account_id, course_id) do
     sql = """
-    SELECT ca.canvas_object
+    SELECT
+      ca.id,
+      ca.canvas_object->>'name'        AS name,
+      ca.canvas_object->>'due_at'      AS due_at,
+      (SELECT COUNT(*)
+       FROM canvas_submissions cs
+       WHERE cs.assignment_id = ca.id
+         AND cs.workflow_state IN ('submitted', 'graded', 'late')
+      )::int                           AS submission_count,
+      (SELECT COUNT(*)
+       FROM canvas_enrollments ce
+       WHERE ce.course_id = $(course_id)
+         AND ce.enrollment_state IN ('active', 'invited')
+         AND ce.canvas_object->>'type' LIKE '%Student%'
+      )::int                           AS total_students
     FROM canvas_assignments ca
     INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
     WHERE sac.service_account_id = $(service_account_id)
       AND ca.course_id = $(course_id)
-    ORDER BY ca.id
+    ORDER BY ca.canvas_object->>'due_at' ASC NULLS LAST, ca.id
     """
 
     case DbHelpers.run_sql(sql, %{
@@ -203,7 +219,7 @@ defmodule CanvasMcp.Data.ServiceAccount do
          }) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
-      rows -> {:ok, Enum.map(rows, & &1["canvas_object"])}
+      rows -> {:ok, rows}
     end
   end
 
@@ -232,18 +248,60 @@ defmodule CanvasMcp.Data.ServiceAccount do
   end
 
   @doc """
+  Returns all submissions for a student across assignments in a course assigned to this service account.
+  """
+  def list_student_submissions(service_account_id, course_id, user_id) do
+    sql = """
+    SELECT
+      cs.assignment_id,
+      ca.canvas_object->>'name'                       AS assignment_name,
+      cs.user_id,
+      cs.canvas_object->>'posted_grade'              AS posted_grade,
+      cs.canvas_object->>'submitted_at'               AS submitted_at,
+      cs.workflow_state,
+      ca.canvas_object->>'due_at'                     AS due_at,
+      cu.canvas_object->>'name'                       AS student_name
+    FROM canvas_submissions cs
+    INNER JOIN canvas_assignments ca ON ca.id = cs.assignment_id
+    INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
+    LEFT JOIN canvas_users cu ON cu.id = cs.user_id
+    WHERE sac.service_account_id = $(service_account_id)
+      AND ca.course_id = $(course_id)
+      AND cs.user_id = $(user_id)
+    ORDER BY ca.canvas_object->>'due_at' ASC NULLS LAST, cs.assignment_id
+    """
+
+    case DbHelpers.run_sql(sql, %{
+           "service_account_id" => service_account_id,
+           "course_id" => to_integer(course_id),
+           "user_id" => to_integer(user_id)
+         }) do
+      {:error, reason} -> {:error, reason}
+      [] -> {:error, :not_found}
+      rows -> {:ok, rows}
+    end
+  end
+
+  @doc """
   Returns all submissions for an assignment in a course assigned to this service account.
   """
   def list_assignment_submissions(service_account_id, course_id, assignment_id) do
     sql = """
-    SELECT cs.canvas_object
+    SELECT
+      cs.user_id,
+      cs.canvas_object->>'posted_grade'              AS posted_grade,
+      cs.canvas_object->>'submitted_at'               AS submitted_at,
+      cs.workflow_state,
+      ca.canvas_object->>'due_at'                     AS due_at,
+      cu.canvas_object->>'name'                       AS student_name
     FROM canvas_submissions cs
     INNER JOIN canvas_assignments ca ON ca.id = cs.assignment_id
     INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
+    LEFT JOIN canvas_users cu ON cu.id = cs.user_id
     WHERE sac.service_account_id = $(service_account_id)
       AND ca.course_id = $(course_id)
       AND cs.assignment_id = $(assignment_id)
-    ORDER BY cs.id
+    ORDER BY cs.user_id
     """
 
     case DbHelpers.run_sql(sql, %{
@@ -253,7 +311,7 @@ defmodule CanvasMcp.Data.ServiceAccount do
          }) do
       {:error, reason} -> {:error, reason}
       [] -> {:error, :not_found}
-      rows -> {:ok, Enum.map(rows, & &1["canvas_object"])}
+      rows -> {:ok, rows}
     end
   end
 

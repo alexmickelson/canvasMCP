@@ -90,6 +90,10 @@ defmodule CanvasMcpWeb.Router do
         Assignments.AssignmentsController,
         :show
 
+    get "/courses/:course_id/students/:user_id/submissions",
+        Submissions.SubmissionsController,
+        :index_by_student
+
     get "/courses/:course_id/assignments/:assignment_id/submissions",
         Submissions.SubmissionsController,
         :index
