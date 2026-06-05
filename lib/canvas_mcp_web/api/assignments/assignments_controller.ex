@@ -46,18 +46,11 @@ defmodule CanvasMcpWeb.Api.Assignments.AssignmentsController do
         }
       },
       "AssignmentsResponse" => %{
-        type: "object",
-        required: ["data"],
-        properties: %{
-          data: %{type: "array", items: %{"$ref" => "#/components/schemas/AssignmentListItem"}}
-        }
+        type: "array",
+        items: %{"$ref" => "#/components/schemas/AssignmentListItem"}
       },
       "AssignmentResponse" => %{
-        type: "object",
-        required: ["data"],
-        properties: %{
-          data: %{"$ref" => "#/components/schemas/Assignment"}
-        }
+        "$ref" => "#/components/schemas/Assignment"
       }
     }
   end
@@ -139,7 +132,7 @@ defmodule CanvasMcpWeb.Api.Assignments.AssignmentsController do
     case ServiceAccount.list_course_assignments(conn.assigns.service_account_id, course_id) do
       {:ok, assignments} ->
         formatted = Enum.map(assignments, &format_assignment/1)
-        json(conn, %{data: formatted})
+        json(conn, formatted)
 
       {:error, :not_found} ->
         conn
@@ -161,7 +154,7 @@ defmodule CanvasMcpWeb.Api.Assignments.AssignmentsController do
            assignment_id
          ) do
       {:ok, assignment} ->
-        json(conn, %{data: assignment})
+        json(conn, assignment)
 
       {:error, :not_found} ->
         conn

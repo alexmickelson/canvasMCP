@@ -8,24 +8,13 @@ defmodule CanvasMcpWeb.Api.Submissions.SubmissionsController do
 
   def openapi_schemas do
     %{
-      "SubmissionStudentListItem" => %{
-        type: "object",
-        properties: %{
-          assignment_id: %{type: "integer", example: 987_654},
-          assignment_name: %{type: "string", nullable: true, example: "Homework 1"},
-          student_name: %{type: "string", nullable: true, example: "Jane Student"},
-          workflow_state: %{type: "string", example: "graded"},
-          score: %{type: "string", nullable: true, example: "95/100"},
-          posted_grade: %{type: "string", nullable: true, example: "95"},
-          submitted_at: %{type: "string", format: "date-time", nullable: true},
-          submitted_at_formatted: %{type: "string", nullable: true, example: "2 hours before due"}
-        }
-      },
       "SubmissionListItem" => %{
         type: "object",
         properties: %{
-          user_id: %{type: "integer", example: 555_666},
+          submission_id: %{type: "integer", example: 111_222},
+          assignment_id: %{type: "integer", example: 987_654},
           student_name: %{type: "string", nullable: true, example: "Jane Student"},
+          student_id: %{type: "integer", example: 555_666},
           workflow_state: %{type: "string", example: "graded"},
           score: %{type: "string", nullable: true, example: "95/100"},
           posted_grade: %{type: "string", nullable: true, example: "95"},
@@ -60,28 +49,15 @@ defmodule CanvasMcpWeb.Api.Submissions.SubmissionsController do
         }
       },
       "StudentSubmissionsResponse" => %{
-        type: "object",
-        required: ["data"],
-        properties: %{
-          data: %{
-            type: "array",
-            items: %{"$ref" => "#/components/schemas/SubmissionStudentListItem"}
-          }
-        }
+        type: "array",
+        items: %{"$ref" => "#/components/schemas/SubmissionListItem"}
       },
       "SubmissionsResponse" => %{
-        type: "object",
-        required: ["data"],
-        properties: %{
-          data: %{type: "array", items: %{"$ref" => "#/components/schemas/SubmissionListItem"}}
-        }
+        type: "array",
+        items: %{"$ref" => "#/components/schemas/SubmissionListItem"}
       },
       "SubmissionResponse" => %{
-        type: "object",
-        required: ["data"],
-        properties: %{
-          data: %{"$ref" => "#/components/schemas/Submission"}
-        }
+        "$ref" => "#/components/schemas/Submission"
       }
     }
   end
@@ -217,8 +193,8 @@ defmodule CanvasMcpWeb.Api.Submissions.SubmissionsController do
            user_id
          ) do
       {:ok, submissions} ->
-        formatted = Enum.map(submissions, &format_student_submission_list_item/1)
-        json(conn, %{data: formatted})
+        formatted = Enum.map(submissions, &format_list_item/1)
+        json(conn, formatted)
 
       {:error, :not_found} ->
         conn
@@ -243,8 +219,8 @@ defmodule CanvasMcpWeb.Api.Submissions.SubmissionsController do
            assignment_id
          ) do
       {:ok, submissions} ->
-        formatted = Enum.map(submissions, &format_submission_list_item/1)
-        json(conn, %{data: formatted})
+        formatted = Enum.map(submissions, &format_list_item/1)
+        json(conn, formatted)
 
       {:error, :not_found} ->
         conn
@@ -274,7 +250,7 @@ defmodule CanvasMcpWeb.Api.Submissions.SubmissionsController do
            submission_id
          ) do
       {:ok, submission} ->
-        json(conn, %{data: submission})
+        json(conn, submission)
 
       {:error, :not_found} ->
         conn
@@ -291,31 +267,16 @@ defmodule CanvasMcpWeb.Api.Submissions.SubmissionsController do
     end
   end
 
-  defp format_student_submission_list_item(row) do
+  defp format_list_item(row) do
     posted_grade = row["posted_grade"]
     submitted_at = row["submitted_at"]
     due_at = row["due_at"]
 
     %{
+      submission_id: row["submission_id"],
       assignment_id: row["assignment_id"],
-      assignment_name: row["assignment_name"],
       student_name: row["student_name"],
-      workflow_state: row["workflow_state"],
-      score: score_string(posted_grade),
-      posted_grade: posted_grade,
-      submitted_at: submitted_at,
-      submitted_at_formatted: relative_to_due(submitted_at, due_at)
-    }
-  end
-
-  defp format_submission_list_item(row) do
-    posted_grade = row["posted_grade"]
-    submitted_at = row["submitted_at"]
-    due_at = row["due_at"]
-
-    %{
-      user_id: row["user_id"],
-      student_name: row["student_name"],
+      student_id: row["user_id"],
       workflow_state: row["workflow_state"],
       score: score_string(posted_grade),
       posted_grade: posted_grade,

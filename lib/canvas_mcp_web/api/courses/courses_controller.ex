@@ -29,18 +29,11 @@ defmodule CanvasMcpWeb.Api.Courses.CoursesController do
         }
       },
       "CoursesResponse" => %{
-        type: "object",
-        required: ["data"],
-        properties: %{
-          data: %{type: "array", items: %{"$ref" => "#/components/schemas/Course"}}
-        }
+        type: "array",
+        items: %{"$ref" => "#/components/schemas/Course"}
       },
       "CourseResponse" => %{
-        type: "object",
-        required: ["data"],
-        properties: %{
-          data: %{"$ref" => "#/components/schemas/Course"}
-        }
+        "$ref" => "#/components/schemas/Course"
       }
     }
   end
@@ -104,7 +97,7 @@ defmodule CanvasMcpWeb.Api.Courses.CoursesController do
   def index(conn, _params) do
     case ServiceAccount.list_assigned_courses(conn.assigns.service_account_id) do
       {:ok, courses} ->
-        json(conn, %{data: courses})
+        json(conn, courses)
 
       {:error, _} ->
         conn
@@ -117,7 +110,7 @@ defmodule CanvasMcpWeb.Api.Courses.CoursesController do
   def show(conn, %{"id" => course_id}) do
     case ServiceAccount.get_assigned_course(conn.assigns.service_account_id, course_id) do
       {:ok, course} ->
-        json(conn, %{data: course})
+        json(conn, course)
 
       {:error, :not_found} ->
         conn

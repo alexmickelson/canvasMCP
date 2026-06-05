@@ -253,18 +253,18 @@ defmodule CanvasMcp.Data.ServiceAccount do
   def list_student_submissions(service_account_id, course_id, user_id) do
     sql = """
     SELECT
+      cs.id                                  AS submission_id,
       cs.assignment_id,
-      ca.canvas_object->>'name'                       AS assignment_name,
+      ca.canvas_object->>'name'               AS assignment_name,
       cs.user_id,
-      cs.canvas_object->>'posted_grade'              AS posted_grade,
-      cs.canvas_object->>'submitted_at'               AS submitted_at,
+      cs.canvas_object->>'posted_grade'       AS posted_grade,
+      cs.canvas_object->>'submitted_at'        AS submitted_at,
       cs.workflow_state,
-      ca.canvas_object->>'due_at'                     AS due_at,
-      cu.canvas_object->>'name'                       AS student_name
+      ca.canvas_object->>'due_at'              AS due_at,
+      cs.canvas_object->'user'->>'name'        AS student_name
     FROM canvas_submissions cs
     INNER JOIN canvas_assignments ca ON ca.id = cs.assignment_id
     INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
-    LEFT JOIN canvas_users cu ON cu.id = cs.user_id
     WHERE sac.service_account_id = $(service_account_id)
       AND ca.course_id = $(course_id)
       AND cs.user_id = $(user_id)
@@ -288,16 +288,17 @@ defmodule CanvasMcp.Data.ServiceAccount do
   def list_assignment_submissions(service_account_id, course_id, assignment_id) do
     sql = """
     SELECT
+      cs.id                                  AS submission_id,
+      cs.assignment_id,
       cs.user_id,
-      cs.canvas_object->>'posted_grade'              AS posted_grade,
-      cs.canvas_object->>'submitted_at'               AS submitted_at,
+      cs.canvas_object->>'posted_grade'       AS posted_grade,
+      cs.canvas_object->>'submitted_at'        AS submitted_at,
       cs.workflow_state,
-      ca.canvas_object->>'due_at'                     AS due_at,
-      cu.canvas_object->>'name'                       AS student_name
+      ca.canvas_object->>'due_at'              AS due_at,
+      cs.canvas_object->'user'->>'name'        AS student_name
     FROM canvas_submissions cs
     INNER JOIN canvas_assignments ca ON ca.id = cs.assignment_id
     INNER JOIN service_account_courses sac ON sac.course_id = ca.course_id
-    LEFT JOIN canvas_users cu ON cu.id = cs.user_id
     WHERE sac.service_account_id = $(service_account_id)
       AND ca.course_id = $(course_id)
       AND cs.assignment_id = $(assignment_id)
